@@ -58,10 +58,13 @@ def main():
     
     print_live("CORROSION FROM 0 TO 100%", names_n_paths)
     
-def import_data_and_print(name, csvpath):
+def import_data_and_print(name, csvpath, figure):
     global si
     global ti
     global v
+
+    ret = []
+
     with open(csvpath) as csv_file:
         csv_reader = csv.reader(csv_file, delimiter=',')
         
@@ -194,8 +197,8 @@ def import_data_and_print(name, csvpath):
     
     major_ticks_s = [x*tick[1] for x in major_ticks] 
     minor_ticks_s = [x*tick[1] for x in minor_ticks] 
-    
-    fig = plt.figure()
+    fig = figure
+    # fig = plt.figure()
     fig.suptitle(name, x=0.2, y=0.98)
     plt.tight_layout()
     ax = fig.add_subplot(1, 1, 1)
@@ -332,6 +335,3 @@ def print_live(name, names_n_paths):
     plt.show()
     
     j = 1
-    
-    
-main()

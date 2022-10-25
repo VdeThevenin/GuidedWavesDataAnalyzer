@@ -5,14 +5,19 @@ from matplotlib import pyplot as pp
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
 import glob
 import csv
-import Plots
+import DataPlotter
+from DataPlotter import Data
+
+# import Plots
+
 
 class GUI:
     def __init__(self):
         self._VARS = {'window': False,
                       'fig_agg': False,
                       'pltFig': False,
-                      'values': []}
+                      'values': [],
+                      'fig_index': 0}
         self._PLOT_PARAM = {'title': False,
                             'x_label': False,
                             'y_label': False,
@@ -30,17 +35,17 @@ class GUI:
                         [sg.Text("trololo", key='word2', size=(12, 0))],
                         [sg.Text("pipipi", key='word3', size=(12, 0))],
                         [sg.Text("popopo", key='word4', size=(12, 0))]]
+        folder_frame = []
 
         layout = [
-            [sg.Text('Root Folder:', size=(9, 0)),
-             sg.In(size=(25, 1), enable_events=True, key='FolderSelected'),
-             sg.FolderBrowse(button_text='Procurar', key='folder_browser')],
-            [sg.Button('<<', key='backward'),
+            [sg.Text('Root Folder:', size=(15, 0)),
+             sg.In(size=(80, 1), enable_events=True, key='FolderSelected'),
+             sg.FolderBrowse(button_text='Browse', key='folder_browser')],
+            [sg.Listbox([], size=(30, 30), select_mode='extended', key='ListBox'),
              sg.Canvas(key='canvas', size=(300, 400)),
-             sg.Button('>>', key='forward'),
              sg.Frame(layout=param_column, title="frame", key='param_col')
              ],
-            [sg.Button('Executar'), sg.Quit('Sair')],
+            [sg.Button('Plot', key='plot_bt'), sg.Quit('Sair')],
         ]
 
         self._VARS['window'] = sg.Window('Guided Waves TDR Data Analyzer', layout, finalize=True)
@@ -54,24 +59,58 @@ class GUI:
                 break
             elif event == 'FolderSelected':
                 p = self._VARS['values']['FolderSelected']
+
                 files = glob.glob(glob.escape(p) + "/*.csv")
 
-                print(files)
-                for i in range(0, len(files)):
+                # initial_data = Data(f, "INITIAL",2.0)
 
+                names_arr = []
+                data_arr = []
 
-                    Plots.import_data_and_print("INITIAL", files[i], self._VARS['window']['canvas'].TKCanvas)
+                for file in files:
+                    names_arr.append(file[file.rfind('\\')+1:])
 
-                # self.data = self.get_data()
+                self._VARS['window']['ListBox'].Update(values=names_arr)
+
+                # DataPlotter.plot_data(initial_data, data_arr[0], self._VARS['pltFig'])
+                # Plots.import_data_and_print("INITIAL", files[self._VARS['fig_index']], self._VARS['pltFig'])
                 self.update_chart()
                 pass
             elif event == 'backward':
                 self._VARS['window']['word1'].Update("backward")
-                pass
+
+                self._VARS['fig_index'] += 1
+
+                if self._VARS['fig_index'] >= len(data_arr):
+                    self._VARS['fig_index'] = 0
+                self.clear_chart()
+                # DataPlotter.plot_data(initial_data, data_arr[self._VARS['fig_index']], self._VARS['pltFig'])
+                # Plots.import_data_and_print("INITIAL", files[self._VARS['fig_index']], self._VARS['pltFig'])
+                self.update_chart()
             elif event == 'forward':
                 self._VARS['window']['word1'].Update("forward")
-                pass
+                self._VARS['fig_index'] -= 1
+
+                if self._VARS['fig_index'] < 0:
+                    self._VARS['fig_index'] = len(data_arr)-1
+                self.clear_chart()
+                # DataPlotter.plot_data(initial_data, data_arr[self._VARS['fig_index']], self._VARS['pltFig'])
+                # Plots.import_data_and_print("INITIAL", files[self._VARS['fig_index']], self._VARS['pltFig'])
+
+                self.update_chart()
+            elif event == 'plot_bt':
+                selected = self._VARS['window']['ListBox'].get_indexes()
+                data_to_plot = []
+                for i in selected:
+                    data_to_plot.append(Data(files[i], names_arr[i]))
+
+                DataPlotter.plot_array(data_to_plot, "teste", self._VARS['pltFig'])
+
+                self.update_chart()
+
             else:
+
+
                 self.update_chart()
 
         self._VARS['window'].close()
@@ -89,9 +128,12 @@ class GUI:
 
     def update_chart(self, **styles):
         self._VARS['fig_agg'].get_tk_widget().forget()
-        pp.clf()
+        # pp.clf()
         self._prepare_plot(**styles)
         self._VARS['fig_agg'] = self.draw_figure(self._VARS['window']['canvas'].TKCanvas, self._VARS['pltFig'])
+
+    def clear_chart(self):
+        pp.clf()
 
     def _prepare_plot(self, **styles):
         if len(self.data) == 0:

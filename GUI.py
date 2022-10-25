@@ -31,10 +31,16 @@ class GUI:
 
         sg.theme('LightGray1')
 
-        param_column = [[sg.Text("blablabla", key='word1', size=(12, 0))],
-                        [sg.Text("trololo", key='word2', size=(12, 0))],
-                        [sg.Text("pipipi", key='word3', size=(12, 0))],
-                        [sg.Text("popopo", key='word4', size=(12, 0))]]
+        param_column = [[sg.Text("Guide Length", key='word1', size=(12, 0)),
+                         sg.Input("1.0", size=(10, 0), key='gLenInput'),
+                         sg.Text(" m", key='len_u', size=(3, 0))],
+                        [sg.Text("Zo", key='word2', size=(12, 0)),
+                         sg.Input("75", size=(10, 0), key='zoInput'),
+                         sg.Text(" ohms", key='zo_u', size=(6, 0))],
+                        [sg.Text("pipipi", key='word3', size=(12, 0)),
+                         sg.Input("1.0", size=(10, 0), key='gLenInput')],
+                        [sg.Text("popopo", key='word4', size=(12, 0)),
+                         sg.Input("1.0", size=(10, 0), key='gLenInput')]]
         folder_frame = []
 
         layout = [
@@ -103,6 +109,8 @@ class GUI:
                 data_to_plot = []
                 for i in selected:
                     data_to_plot.append(Data(files[i], names_arr[i]))
+
+                self.clear_chart()
 
                 DataPlotter.plot_array(data_to_plot, "teste", self._VARS['pltFig'])
 

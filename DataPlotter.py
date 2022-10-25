@@ -16,7 +16,7 @@ class Data:
         with open(csvpath) as csv_file:
             csv_reader = csv.reader(csv_file, delimiter=',')
             
-            x = []
+            t = []
             y = []
         
             
@@ -24,18 +24,19 @@ class Data:
                 if len(row) < 3 or row[0]=="Time":
                     pass
                 else:                
-                    x.append(float(row[0]))
+                    t.append(float(row[0]))
                     y.append(float(row[1]))
         
         self.name = name
-        self.x = x
+        self.t = t
         self.y = y
+        self.x = 0
         self.guide_len = guide_len
         self.Zo = Zo
         
         self.mAvg = 0 
         self.deriv = 0
-        self.x_break = 0 
+        self.t_break = 0
         self.y_break = 0
         self.imax = 0
         self.diff_positions = []
@@ -48,6 +49,7 @@ class Data:
         self.get_moving_average()
         self.get_deriv()
         self.calculate_params()
+        self.set_x()
         
     def get_moving_average(self, wsz = 70):
         window_size = wsz
@@ -77,7 +79,7 @@ class Data:
         return moving_averages
     
     def get_deriv(self, lim_i=None, lim_s=None):
-        x = self.x
+        t = self.t
         y = self.y
         
         if lim_i is None or lim_s is None:
@@ -88,20 +90,20 @@ class Data:
         
         imax = 0
         for i in range(lim_i, lim_s):
-            deriv.append((y[i+1]-y[i])/(x[i+1]-x[i]))
+            deriv.append((y[i+1]-y[i])/(t[i+1]-t[i]))
             maxderiv = max(deriv)
             if deriv[-1] == maxderiv:
                 imax = i
 
         self.imax = imax
-        self.x_break = x[imax]
+        self.t_break = t[imax]
         self.y_break = y[imax]
         self.deriv = deriv
         
         
     def calculate_params(self):
         
-        self.speed = (2*self.guide_len)/self.x_break
+        self.speed = (2*self.guide_len)/self.t_break
                     
         self.capacitance = 1/(self.Zo*self.speed)
         
@@ -111,7 +113,13 @@ class Data:
         u0 = 4*np.pi*1e-7
         
         self.relative_permissivity = 1/(self.speed**2*e0*u0)
-        
+
+    def set_x(self):
+        t = self.t
+        v = self.speed
+
+        self.x = [ti*v for ti in t]
+
     def set_Zo(self, Zo):
         self.Zo = Zo
         self.calculate_params()
@@ -121,11 +129,8 @@ class Data:
         self.calculate_params()
         
     def diff(self, data : 'Data', lim_i=None, lim_s=None, threshold=0.005, window=5):
-        
-        # x = self.x
+
         y = self.y
-        
-        # x0 = data.x
         y0 = data.y
         
         if lim_i is None or lim_s is None:
@@ -145,11 +150,11 @@ class Data:
         
 def isTheBiggestInWindow(i, y, window):
     
-    windowArr = y[i-int(window/2):i-1] + y[i+1: i+int(window/2)]
+    window_arr = y[i-int(window/2):i-1] + y[i+1: i+int(window/2)]
     
     r = True
     
-    for e in windowArr:
+    for e in window_arr:
         if y[i] < e:
             r = False
     return r
@@ -171,9 +176,18 @@ def plot_array(data_arr, name, figure):
     # reverse the order
     ax.legend(handles[::-1], labels[::-1])
 
+    ax2 = ax.twiny()
+    ax2.set_xlim(ax.get_xlim())
+    # ax2.set_xticks(data_arr[0].t)
+    # ax2.set_xticklabels(data_arr[0].t)
+    # ax2.set_xticks(minor_ticks_t, minor=True)
+
+    ax.set_xlabel("length [m]")
+    ax2.set_xlabel('time [s]')
+    ax.set_ylabel(r'$S_{11}$' + " Parameter")
 
 def plot_data(ref: Data, data : Data, figure):
-    tick = [0,0]
+    tick = [0, 0]
     tick_size = 100
     
     major_ticks = np.arange(0, tick_size+1, 20)
@@ -207,7 +221,7 @@ def plot_data(ref: Data, data : Data, figure):
     ax2.set_xticks(major_ticks_t)
     ax2.set_xticklabels(tick_fct(data.speed, major_ticks_t))
     ax2.set_xticks(minor_ticks_t, minor=True)
-    
+
     ax2.set_xlabel("length [m]")
     ax.set_xlabel('time [s]')
     ax.set_ylabel(r'$S_{11}$' + " Parameter")

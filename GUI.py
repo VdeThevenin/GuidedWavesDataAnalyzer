@@ -32,15 +32,42 @@ class GUI:
         sg.theme('LightGray1')
 
         param_column = [[sg.Text("Guide Length", key='word1', size=(12, 0)),
-                         sg.Input("1.0", size=(10, 0), key='gLenInput'),
-                         sg.Text(" m", key='len_u', size=(3, 0))],
+                         sg.Input("1.0", size=(10, 0), key='gLenInput', enable_events=True),
+                         sg.Text("m", key='len_u', size=(3, 0))],
                         [sg.Text("Zo", key='word2', size=(12, 0)),
-                         sg.Input("75", size=(10, 0), key='zoInput'),
-                         sg.Text(" ohms", key='zo_u', size=(6, 0))],
-                        [sg.Text("pipipi", key='word3', size=(12, 0)),
-                         sg.Input("1.0", size=(10, 0), key='gLenInput')],
-                        [sg.Text("popopo", key='word4', size=(12, 0)),
-                         sg.Input("1.0", size=(10, 0), key='gLenInput')]]
+                         sg.Input("75", size=(10, 0), key='zoInput', enable_events=True),
+                         sg.Text("\u03A9", key='zo_u', size=(6, 0))],
+                        [sg.Text("Capacitance", key='word3', size=(12, 0)),
+                         sg.InputText('',
+                                      size=(10, 0),
+                                      text_color='black',
+                                      use_readonly_for_disable=True,
+                                      disabled=True,
+                                      key='CapOutput'),
+                         sg.Text("F", key='C_u', size=(6, 0))],
+                        [sg.Text("Inductance", key='word4', size=(12, 0)),
+                         sg.InputText('',
+                                      size=(10, 0),
+                                      text_color='black',
+                                      use_readonly_for_disable=True,
+                                      disabled=True,
+                                      key='IndOutput'),
+                         sg.Text("H", key='L_u', size=(6, 0))],
+                        [sg.Text("wave speed", key='word4', size=(12, 0)),
+                         sg.InputText('',
+                                      size=(10, 0),
+                                      text_color='black',
+                                      use_readonly_for_disable=True,
+                                      disabled=True,
+                                      key='WSOutput'),
+                         sg.Text("m/s", key='ws_u', size=(6, 0))],
+                        [sg.Text("\u03B5r", key='word4', size=(12, 0)),
+                         sg.InputText('',
+                                      size=(10, 0),
+                                      text_color='black',
+                                      use_readonly_for_disable=True,
+                                      disabled=True,
+                                      key='RPOutput')]]
         folder_frame = []
 
         layout = [
@@ -58,6 +85,10 @@ class GUI:
 
     def start(self):
         self.draw_chart()
+        names_arr = []
+        data_arr = []
+        selected = []
+        data_to_plot = []
         while True:
             event, self._VARS['values'] = self._VARS['window'].Read()
 
@@ -70,9 +101,6 @@ class GUI:
 
                 # initial_data = Data(f, "INITIAL",2.0)
 
-                names_arr = []
-                data_arr = []
-
                 for file in files:
                     names_arr.append(file[file.rfind('\\')+1:])
 
@@ -80,35 +108,61 @@ class GUI:
 
                 # DataPlotter.plot_data(initial_data, data_arr[0], self._VARS['pltFig'])
                 # Plots.import_data_and_print("INITIAL", files[self._VARS['fig_index']], self._VARS['pltFig'])
-                self.update_chart()
+                # self.update_chart()
                 pass
-            elif event == 'backward':
-                self._VARS['window']['word1'].Update("backward")
+            elif event == 'gLenInput' or event == 'zoInput':
 
-                self._VARS['fig_index'] += 1
+                glen = validate_field_value(self._VARS['values']['gLenInput'])
+                self._VARS['window']['gLenInput'].Update(value=glen)
+                zo = validate_field_value(self._VARS['values']['zoInput'])
+                self._VARS['window']['zoInput'].Update(value=zo)
 
-                if self._VARS['fig_index'] >= len(data_arr):
-                    self._VARS['fig_index'] = 0
-                self.clear_chart()
-                # DataPlotter.plot_data(initial_data, data_arr[self._VARS['fig_index']], self._VARS['pltFig'])
-                # Plots.import_data_and_print("INITIAL", files[self._VARS['fig_index']], self._VARS['pltFig'])
-                self.update_chart()
-            elif event == 'forward':
-                self._VARS['window']['word1'].Update("forward")
-                self._VARS['fig_index'] -= 1
+                Er = 0
 
-                if self._VARS['fig_index'] < 0:
-                    self._VARS['fig_index'] = len(data_arr)-1
-                self.clear_chart()
-                # DataPlotter.plot_data(initial_data, data_arr[self._VARS['fig_index']], self._VARS['pltFig'])
-                # Plots.import_data_and_print("INITIAL", files[self._VARS['fig_index']], self._VARS['pltFig'])
+                if len(data_to_plot) != 0:
+                    for data in data_to_plot:
+                        data.set_GuideLen(float(glen))
+                        data.set_Zo(float(zo))
+                        if data.name.__contains__('ORIG'):
+                            C = DataPlotter.set_unit_prefix(data.capacitance, "F")
+                            L = DataPlotter.set_unit_prefix(data.inductance, "H")
+                            Er = data.relative_permissivity
+                            WS = data.speed
+                            self.update_param_frame((C, L, Er, WS))
 
-                self.update_chart()
+                    if Er == 0:
+                        C = DataPlotter.set_unit_prefix(data_to_plot[0].capacitance, "F")
+                        L = DataPlotter.set_unit_prefix(data_to_plot[0].inductance, "H")
+                        Er = data_to_plot[0].relative_permissivity
+                        WS = data_to_plot[0].speed
+                        self.update_param_frame((C, L, Er, WS))
+
             elif event == 'plot_bt':
-                selected = self._VARS['window']['ListBox'].get_indexes()
                 data_to_plot = []
+                selected = self._VARS['window']['ListBox'].get_indexes()
+
+                gLen = float(self._VARS['values']['gLenInput'])
+                Zo = float(self._VARS['values']['zoInput'])
+                C = (0, " \u03BCF")
+                L = (0, "mH")
+                Er = 0
+                WS = 0
+
                 for i in selected:
-                    data_to_plot.append(Data(files[i], names_arr[i]))
+                    data_to_plot.append(Data(files[i], names_arr[i], gLen, Zo))
+                    if names_arr[i].__contains__("ORIG"):
+                        C = DataPlotter.set_unit_prefix(data_to_plot[-1].capacitance, "F")
+                        L = DataPlotter.set_unit_prefix(data_to_plot[-1].inductance, "H")
+                        Er = data_to_plot[-1].relative_permissivity
+                        WS = data_to_plot[-1].speed
+
+                if Er == 0:
+                    C = DataPlotter.set_unit_prefix(data_to_plot[0].capacitance, "F")
+                    L = DataPlotter.set_unit_prefix(data_to_plot[0].inductance, "H")
+                    Er = data_to_plot[0].relative_permissivity
+                    WS = data_to_plot[0].speed
+
+                self.update_param_frame((C, L, Er, WS))
 
                 self.clear_chart()
 
@@ -117,9 +171,9 @@ class GUI:
                 self.update_chart()
 
             else:
+                pass
 
-
-                self.update_chart()
+                #self.update_chart()
 
         self._VARS['window'].close()
 
@@ -192,65 +246,41 @@ class GUI:
         # y = np.array(s)
         return [[t, s, 'original data']]
 
-    def time_formatter(self, t):
-        stime = ''
-        t_m = t // 60
-        t_h = t_m // 60
-        t_s = t % 60
-        if t_h > 0 or t_m > 0:
-            if t_h > 0:
-                stime = "{t}".format(t=int(t_h)) + ' hora'
-                if t_h > 1:
-                    stime += 's'
-                stime += ', '
-            if t_m > 0:
-                stime = "{t}".format(t=int(t_m)) + ' minuto'
-                if t_m > 1:
-                    stime += 's'
-                stime += ', '
-            if t_s > 0:
-                stime = "{t}".format(t=int(t_s)) + ' segundo'
-                if t_s > 1:
-                    stime += 's'
-                stime += ', '
-        else:
-            if t_s >= 1:
-                stime = "{t:.2f}".format(t=t_s) + ' segundo'
-                if t_s >= 2:
-                    stime += 's'
-                stime += ', '
-            elif not t_s - int(t_s) == 0:
-                ok = False
-                t_s1 = t_s
-                idx = 0
-                while not ok:
-                    t_s1 = t_s1 * 10
-                    idx += 1
-                    if t_s1 >= 1:
-                        ok = True
-                if not idx % 3 == 0:
-                    while not idx % 3 == 0:
-                        idx += 1
-                        t_s1 *= 10
-                stime += "{t:.2f}".format(t=t_s1)
-                if idx / 3 == 1:
-                    stime += ' ms'
-                elif idx / 3 == 2:
-                    stime += ' µs'
-                elif idx / 3 == 3:
-                    stime += ' ns'
-                elif idx / 3 == 4:
-                    stime += ' ps'
-                elif idx / 3 == 5:
-                    stime += ' fs'
-                elif idx / 3 == 6:
-                    stime += ' as'
-                elif idx / 3 == 7:
-                    stime += ' zs'
-                elif idx / 3 == 8:
-                    stime += ' ys'
-        return stime
+    def update_param_frame(self, data):
+        C, L, Er, WS = data
 
+        self._VARS['window']['CapOutput'].Update(value=f'{C[0]:.2f}')
+        self._VARS['window']['C_u'].Update(value=C[1])
+        self._VARS['window']['IndOutput'].Update(value=f'{L[0]:.2f}')
+        self._VARS['window']['L_u'].Update(value=L[1])
+        self._VARS['window']['RPOutput'].Update(value=f'{Er:.2f}')
+        self._VARS['window']['WSOutput'].Update(value=int(WS))
+
+
+def validate_field_value(newval : str):
+    alphalist = [chr(i) for i in range(ord('A'), ord('Z')+1)]
+    alphalist += [chr(i) for i in range(ord('a'), ord('z')+1)]
+
+    if newval == '' or newval == '-':
+        return 0
+    if newval.__contains__('-'):
+        return newval[:-1]
+    if any(x in newval for x in alphalist):
+        if len(newval) >= 2:
+            return newval[:-1]
+        else:
+            return 0
+    if len(newval) > 1 and newval.startswith('0') and not (newval.__contains__('.') or newval.__contains__(',')):
+        return newval[-1]
+    if (newval.__contains__('.') or newval.__contains__(',')) and len(newval) == 1:
+        return '0.'
+    if newval.count('.') > 1:
+        if len(newval) >= 2:
+            return newval[:-1]
+        else:
+            return 0
+    else:
+        return newval
 
 tela = GUI()
 tela.start()

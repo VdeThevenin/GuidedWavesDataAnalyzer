@@ -102,7 +102,11 @@ class Data:
         
         
     def calculate_params(self):
-        
+
+        if self.guide_len == 0:
+            self.guide_len = 1e-25
+        if self.Zo == 0:
+            self.Zo = 1e-25
         self.speed = (2*self.guide_len)/self.t_break
                     
         self.capacitance = 1/(self.Zo*self.speed)
@@ -118,7 +122,7 @@ class Data:
         t = self.t
         v = self.speed
 
-        self.x = [ti*v for ti in t]
+        self.x = [ti*v/2 for ti in t]
 
     def set_Zo(self, Zo):
         self.Zo = Zo
@@ -166,7 +170,7 @@ def plot_array(data_arr, name, figure):
     ax = figure.add_subplot(1, 1, 1)
 
     for data in data_arr:
-        ax.plot(data.x, data.y, label=data.name)
+        ax.plot(data.t, data.y, label=data.name)
 
     ax.grid()
     ax.grid(visible=True, which='minor', color='lightgray', linestyle='-')
@@ -182,8 +186,8 @@ def plot_array(data_arr, name, figure):
     # ax2.set_xticklabels(data_arr[0].t)
     # ax2.set_xticks(minor_ticks_t, minor=True)
 
-    ax.set_xlabel("length [m]")
-    ax2.set_xlabel('time [s]')
+    ax2.set_xlabel("length [m]")
+    ax.set_xlabel('time [s]')
     ax.set_ylabel(r'$S_{11}$' + " Parameter")
 
 def plot_data(ref: Data, data : Data, figure):
@@ -239,3 +243,32 @@ def plot_data(ref: Data, data : Data, figure):
 
     # reverse the order
     ax.legend(handles[::-1], labels[::-1])
+
+
+def set_unit_prefix(value, main_unit):
+
+    m_arr = ['k', 'M', 'G', 'T', 'P', 'E', 'Z', 'Y']
+    d_arr = ['m', '\u03BC', 'n', 'p', 'f', 'a', 'z', 'y']
+
+    a = abs(value)
+    s = (value/abs(value))
+    m = -1
+    d = -1
+
+    if a >= 1000:
+        while a >= 1000:
+            a /= 1000
+            m += 1
+    elif a <= 0.001:
+        while a <= 1:
+            a *= 1000
+            d += 1
+    else:
+        return value, main_unit
+
+    a = s*a
+
+    if m >= 0:
+        return a, (m_arr[m]+main_unit)
+    else:
+        return a, (d_arr[d]+main_unit)

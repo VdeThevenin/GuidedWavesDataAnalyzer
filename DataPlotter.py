@@ -180,13 +180,13 @@ def plot_array(data_arr, name, figure):
     # reverse the order
     ax.legend(handles[::-1], labels[::-1])
 
-    ax2 = ax.twiny()
-    ax2.set_xlim(ax.get_xlim())
+    #ax2 = ax.twiny()
+    #ax2.set_xlim(ax.get_xlim())
     # ax2.set_xticks(data_arr[0].t)
     # ax2.set_xticklabels(data_arr[0].t)
     # ax2.set_xticks(minor_ticks_t, minor=True)
 
-    ax2.set_xlabel("length [m]")
+    #ax2.set_xlabel("length [m]")
     ax.set_xlabel('time [s]')
     ax.set_ylabel(r'$S_{11}$' + " Parameter")
 

@@ -1,5 +1,6 @@
 from os import path
 import PySimpleGUI as sg
+import matplotlib.pyplot as plt
 import numpy as np
 from matplotlib import pyplot as pp
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
@@ -7,7 +8,7 @@ import glob
 import csv
 import DataPlotter
 from DataPlotter import Data
-
+from ZoomPan import ZoomPan
 # import Plots
 
 
@@ -81,7 +82,7 @@ class GUI:
             [sg.Button('Plot', key='plot_bt'), sg.Quit('Sair')],
         ]
 
-        self._VARS['window'] = sg.Window('Guided Waves TDR Data Analyzer', layout, finalize=True)
+        self._VARS['window'] = sg.Window('Guided Waves TDR Data Analyzer', layout, finalize=True, return_keyboard_events=True)
 
     def start(self):
         self.draw_chart()
@@ -89,6 +90,8 @@ class GUI:
         data_arr = []
         selected = []
         data_to_plot = []
+        zp = ZoomPan()
+
         while True:
             event, self._VARS['values'] = self._VARS['window'].Read()
 
@@ -170,10 +173,14 @@ class GUI:
 
                 self.update_chart()
 
+                figZoom = zp.zoom_factory(base_scale=1.1)
+                figPan = zp.pan_factory(plt.gca())
+            elif event == 'MouseWheel:Up':
+                pass
+            elif event == 'MouseWheel:Down':
+                pass
             else:
                 pass
-
-                #self.update_chart()
 
         self._VARS['window'].close()
 

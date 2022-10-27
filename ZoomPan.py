@@ -98,8 +98,10 @@ class ZoomPan:
             ax.figure.canvas.draw()
 
         def onMotion(event):
-            if self.press is None: return
-            if event.inaxes != ax: return
+            if self.press is None:
+                return
+            if event.inaxes != ax:
+                return
             dx = event.xdata - self.xpress
             dy = event.ydata - self.ypress
             self.cur_xlim -= dx
@@ -109,12 +111,12 @@ class ZoomPan:
 
             ax.figure.canvas.draw()
 
-        fig = ax.get_figure() # get the figure of interest
+        fig = ax.get_figure()  # get the figure of interest
 
         # attach the call back
-        # fig.canvas.mpl_connect('button_press_event', onPress)
-        # fig.canvas.mpl_connect('button_release_event', onRelease)
+        fig.canvas.mpl_connect('button_press_event', onPress)
+        fig.canvas.mpl_connect('button_release_event', onRelease)
         fig.canvas.mpl_connect('motion_notify_event', onMotion)
 
-        #return the function
+        # return the function
         return onMotion

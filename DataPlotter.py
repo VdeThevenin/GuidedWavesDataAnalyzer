@@ -9,7 +9,7 @@ import csv
 import numpy as np
 import matplotlib.pyplot as plt
 from matplotlib.ticker import FormatStrFormatter
-
+from ifft import ifft_new
 
 class Data:
     def __init__(self, csvpath, name, guide_len=1.0, Zo=75.0):
@@ -169,6 +169,11 @@ def plot_array(data_arr, name, figure):
     plt.tight_layout()
     ax = figure.add_subplot(1, 1, 1)
 
+    t_axis, td, sr_Z = ifft_new()
+
+    ax.plot(t_axis, td, label="IFFT TDR")
+    # ax.plot(t_axis, td, label="IFFT TDR")
+
     for data in data_arr:
         ax.plot(data.t, data.y, label=data.name)
 
@@ -212,6 +217,7 @@ def plot_data(ref: Data, data : Data, figure):
 
     ax.plot(data.x, data.y, label="current")
     ax.plot(ref.x, ref.y, label="initial")
+
     # ax.plot(t,mean)
     
     plt.xlim([0, tick[0]])

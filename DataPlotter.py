@@ -11,7 +11,7 @@ import matplotlib.pyplot as plt
 import skrf as rf
 from matplotlib.ticker import FormatStrFormatter
 from ifft import ifft
-
+from scipy.signal import butter, filtfilt
 
 class Data:
     def __init__(self, path, name, guide_len=1.0, Zo=75.0, s1p=False):
@@ -34,11 +34,15 @@ class Data:
         
         self.name = name
         self.t = t
-        self.y = y
+        self.y = butter_lowpass_filter(y, 30, 101, 2)
         self.z = z
         self.x = 0
+        self.lim_signal = 0.07
         self.guide_len = guide_len
         self.Zo = Zo
+
+        self.t1 = []
+        self.t2 = []
         
         self.mAvg = 0 
         self.deriv = 0
@@ -87,7 +91,9 @@ class Data:
     def get_deriv(self, lim_i=None, lim_s=None):
         t = self.t
         y = self.y
-        
+
+        after_imax = 6
+
         if lim_i is None or lim_s is None:
             lim_i = int(len(y)/10)
             lim_s = len(y)-1
@@ -113,7 +119,27 @@ class Data:
         max1 = np.max(deriv)
 
         deriv = deriv/max1
-        self.deriv = deriv
+        self.deriv = butter_lowpass_filter(deriv, 8, 101, 4)
+
+        # maximum_points = np.where(self.deriv == np.max(self.deriv))
+        #maximum_points = np.where(self.deriv >= self.lim_signal)
+
+
+        self.t = t[:imax+after_imax]
+        self.y = y[:imax+after_imax]
+        self.deriv = deriv[:imax+after_imax]
+
+        maximum_points = get_all_max_points(self.deriv, self.lim_signal)
+
+        print(maximum_points)
+        print(self.deriv[maximum_points])
+        print(self.t[maximum_points])
+
+        self.t2 = self.deriv[maximum_points]
+        self.t1 = self.t[maximum_points]
+
+
+
         
         
     def calculate_params(self):
@@ -184,14 +210,11 @@ def plot_array(data_arr, name, figure):
     plt.tight_layout()
     ax = figure.add_subplot(1, 1, 1)
 
-    # t_axis, td, sr_Z = ifft_new()
-
-    # ax.plot(t_axis, td, label="IFFT TDR")
-    # ax.plot(t_axis, td, label="IFFT TDR")
-
     for data in data_arr:
         ax.plot(data.t, data.y, label=data.name)
-        # ax.plot(data.t, data.deriv, label=data.name + ": deriv")
+        ax.plot(data.t, data.deriv, label=data.name + ": deriv")
+        ax.scatter(data.t1, data.t2, label=data.name + ": max")
+
 
     ax.grid()
     ax.grid(visible=True, which='minor', color='lightgray', linestyle='-')
@@ -294,3 +317,40 @@ def set_unit_prefix(value, main_unit):
         return a, (m_arr[m]+main_unit)
     else:
         return a, (d_arr[d]+main_unit)
+
+
+def butter_lowpass_filter(data, cutoff, fs, order):
+    nyq = 0.5 * fs
+    normal_cutoff = cutoff / nyq
+    # Get the filter coefficients
+    b, a = butter(order, normal_cutoff, btype='low', analog=False)
+    y = filtfilt(b, a, data)
+    return y
+
+
+def get_all_max_points(data, limit):
+    higher_points = np.where(data >= limit)
+
+    maxp = [[]]
+    j = 0
+    k = len(higher_points[0])
+    for i in range(0, k-1):
+        maxp[j].append(higher_points[0][i])
+        if higher_points[0][i+1]-higher_points[0][i] > 1:
+            maxp.append([])
+            j += 1
+    print(maxp)
+
+    maximum_points = []
+    for mp in maxp:
+        maximum_points.append(np.median(mp))
+
+    maximum_points = [int(x) for x in maximum_points]
+
+    exceeded_points = np.where(data[maximum_points] < 0.4)
+
+    max = []
+    for i in exceeded_points[0]:
+        max.append(maximum_points[i])
+
+    return max

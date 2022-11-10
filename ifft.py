@@ -11,7 +11,7 @@ from ctypes import *
 def ifft(path, Zo=50):
     raw_points = 101
     NFFT = 256
-    beta = 6
+    beta = 0
 
     cable = rf.Network(path)
 
@@ -21,7 +21,7 @@ def ifft(path, Zo=50):
 
     window_scale = 1.0 / (NFFT * bessel0_ext(beta * beta / 4.0))
 
-    window = np.kaiser(NFFT, 0) * window_scale
+    window = np.kaiser(NFFT, 13) * window_scale
     window = window_scale
     s11 = window * s11
     td1 = sp.fft.ifft(s11, NFFT)

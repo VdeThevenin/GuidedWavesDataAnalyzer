@@ -98,9 +98,13 @@ class GUI:
             if event in (None, 'Sair'):
                 break
             elif event == 'FolderSelected':
+                names_arr = []
                 p = self._VARS['values']['FolderSelected']
 
-                files = glob.glob(glob.escape(p) + "/*.csv")
+                types = ('/*.csv', '/*.s1p')  # the tuple of file types
+                files = []
+                for tp in types:
+                    files.extend(glob.glob(glob.escape(p) + tp))
 
                 # initial_data = Data(f, "INITIAL",2.0)
 
@@ -126,7 +130,7 @@ class GUI:
                     for data in data_to_plot:
                         data.set_GuideLen(float(glen))
                         data.set_Zo(float(zo))
-                        if data.name.__contains__('ORIG'):
+                        if data_to_plot.index(data) == 0:
                             C = DataPlotter.set_unit_prefix(data.capacitance, "F")
                             L = DataPlotter.set_unit_prefix(data.inductance, "H")
                             Er = data.relative_permissivity
@@ -152,7 +156,11 @@ class GUI:
                 WS = 0
 
                 for i in selected:
-                    data_to_plot.append(Data(files[i], names_arr[i], gLen, Zo))
+                    s1p = False
+                    if files[i].__contains__(".s1p") or files[i].__contains__(".S1P"):
+                        s1p = True
+
+                    data_to_plot.append(Data(files[i], names_arr[i], gLen, Zo, s1p))
                     if names_arr[i].__contains__("ORIG"):
                         C = DataPlotter.set_unit_prefix(data_to_plot[-1].capacitance, "F")
                         L = DataPlotter.set_unit_prefix(data_to_plot[-1].inductance, "H")

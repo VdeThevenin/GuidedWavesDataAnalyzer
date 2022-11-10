@@ -1,52 +1,76 @@
 import skrf as rf
 import matplotlib.pyplot as plt
 from scipy import constants
+import scipy as sp
 import numpy as np
+from fft import transform
 
-def ifft_new():
+from ctypes import *
+
+
+def ifft(path, Zo=50):
     raw_points = 101
-    NFFT = 16384
-    PROPAGATION_SPEED = 66.8
-    Zo = 75
+    NFFT = 256
+    beta = 6
 
-    _prop_speed = PROPAGATION_SPEED / 100
-    cable = rf.Network('C:\\Users\\Vidya-HW2\\Desktop\\TCC\\cable_r59.s1p')
+    cable = rf.Network(path)
 
     s11 = cable.s[:, 0, 0]
-    window = np.hanning(raw_points)
+
+    s11 = np.append(s11, np.zeros(NFFT-len(s11)))
+
+    window_scale = 1.0 / (NFFT * bessel0_ext(beta * beta / 4.0))
+
+    window = np.kaiser(NFFT, 0) * window_scale
+    window = window_scale
     s11 = window * s11
-    td1 = np.fft.ifft(s11, NFFT)
-
-    td = np.abs(np.fft.ifft(s11, NFFT))
-
-    td = td * 1000
+    td1 = sp.fft.ifft(s11, NFFT)
+    td = transform(s11, True)
 
     # Create step waveform and compute step response
     step = np.ones(NFFT)
-    step_response = np.convolve(td1, step)
+    step_response = np.convolve(td, step)
     step_response_Z = Zo * (1 + step_response) / (1 - step_response)
     step_response_Z = step_response_Z[:16384]
 
+    td_r = [np.real(x) for x in td]
+    td_i = [np.imag(x) for x in td]
+
+    for i in range(1, len(td_r)):
+        td_r[i] += td_r[i-1]
+
     # Calculate maximum time axis
     t_axis = np.linspace(0, 1 / cable.frequency.step, NFFT)
-    d_axis = constants.speed_of_light * _prop_speed * t_axis / 2
 
     # find the peak and distance
-    pk = np.max(td)
-    idx_pk = np.where(td == pk)[0]
+    # pk = np.max(td)
+    # idx_pk = np.where(td == pk)[0]
     # print(d_axis[idx_pk[0]])
 
-    return t_axis[:idx_pk[0]], td[:idx_pk[0]], step_response_Z[:idx_pk[0]]
+    return t_axis, td_r, step_response_Z
 
-    # Plot time response
-    # fig, ax1 = plt.subplots()
-    # ax2 = ax1.twinx()
-    # ax2.set_ylim([0, 500])
-    # ax2.yaxis.set_ticks(np.arange(0, 500, 50))
-    # ax1.plot(t_axis[:idx_pk[0]], td[:idx_pk[0]], 'g-')
-    # ax2.plot(t_axis[:idx_pk[0]], step_response_Z[:idx_pk[0]], 'r-')
-    # ax1.set_xlabel("Distance (m)")
-    # ax1.set_ylabel("Reflection Magnitude")
-    # ax2.set_ylabel("Impedance (Ohms)")
-    # ax1.set_title("Return loss Time domain")
-    # plt.show()
+
+def bessel0_ext(x_pow_2):
+    div = [1/4.0,   1/9.0,   1/16.0,
+           1/25.0,  1/36.0,  1/49.0,
+           1/64.0,  1/81.0,  1/100.0,
+           1/121.0, 1/144.0, 1/169.0,
+           1/196.0, 1/225.0, 1/256.0]
+
+    SIZE = (13 - 2)
+    i = SIZE
+    term = x_pow_2
+    ret = 1.0 + term
+
+    '''
+    do
+    {
+        term *= x_pow_2 * div[SIZE - i];
+        ret += term;
+    } while (--i);
+    '''
+    for i in range(0, SIZE):
+        term *= x_pow_2 * div[i]
+        ret += term
+
+    return ret

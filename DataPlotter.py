@@ -8,28 +8,34 @@ Created on Tue Oct 25 09:59:03 2022
 import csv
 import numpy as np
 import matplotlib.pyplot as plt
+import skrf as rf
 from matplotlib.ticker import FormatStrFormatter
-from ifft import ifft_new
+from ifft import ifft
+
 
 class Data:
-    def __init__(self, csvpath, name, guide_len=1.0, Zo=75.0):
-        with open(csvpath) as csv_file:
-            csv_reader = csv.reader(csv_file, delimiter=',')
-            
-            t = []
-            y = []
-        
-            
-            for row in csv_reader:
-                if len(row) < 3 or row[0]=="Time":
-                    pass
-                else:                
-                    t.append(float(row[0]))
-                    y.append(float(row[1]))
+    def __init__(self, path, name, guide_len=1.0, Zo=75.0, s1p=False):
+        if not s1p:
+            with open(path) as csv_file:
+                csv_reader = csv.reader(csv_file, delimiter=',')
+
+                t = []
+                y = []
+
+                for row in csv_reader:
+                    if len(row) < 3 or row[0] == "Time":
+                        pass
+                    else:
+                        t.append(float(row[0]))
+                        y.append(float(row[1]))
+                z = Zo
+        else:
+            t, y, z = ifft(path, Zo)
         
         self.name = name
         self.t = t
         self.y = y
+        self.z = z
         self.x = 0
         self.guide_len = guide_len
         self.Zo = Zo
@@ -87,7 +93,9 @@ class Data:
             lim_s = len(y)-1
         
         deriv = []
-        
+        for i in range(0, lim_i):
+            deriv.append(0)
+
         imax = 0
         for i in range(lim_i, lim_s):
             deriv.append((y[i+1]-y[i])/(t[i+1]-t[i]))
@@ -95,9 +103,16 @@ class Data:
             if deriv[-1] == maxderiv:
                 imax = i
 
+        for i in range(lim_s, len(y)):
+            deriv.append(0)
+
         self.imax = imax
         self.t_break = t[imax]
         self.y_break = y[imax]
+
+        max1 = np.max(deriv)
+
+        deriv = deriv/max1
         self.deriv = deriv
         
         
@@ -169,13 +184,14 @@ def plot_array(data_arr, name, figure):
     plt.tight_layout()
     ax = figure.add_subplot(1, 1, 1)
 
-    t_axis, td, sr_Z = ifft_new()
+    # t_axis, td, sr_Z = ifft_new()
 
-    ax.plot(t_axis, td, label="IFFT TDR")
+    # ax.plot(t_axis, td, label="IFFT TDR")
     # ax.plot(t_axis, td, label="IFFT TDR")
 
     for data in data_arr:
         ax.plot(data.t, data.y, label=data.name)
+        # ax.plot(data.t, data.deriv, label=data.name + ": deriv")
 
     ax.grid()
     ax.grid(visible=True, which='minor', color='lightgray', linestyle='-')

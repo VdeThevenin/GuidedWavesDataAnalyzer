@@ -12,9 +12,11 @@ import skrf as rf
 from matplotlib.ticker import FormatStrFormatter
 from ifft import ifft
 from scipy.signal import butter, filtfilt
+from pandas import DataFrame, date_range
 
 class Data:
     def __init__(self, path, name, guide_len=1.0, Zo=75.0, s1p=False):
+
         if not s1p:
             with open(path) as csv_file:
                 csv_reader = csv.reader(csv_file, delimiter=',')
@@ -37,13 +39,14 @@ class Data:
         self.y = butter_lowpass_filter(y, 30, 101, 2)
         self.z = z
         self.x = 0
-        self.lim_signal = 0.07
+        self.lim_signal = 0.08
         self.guide_len = guide_len
         self.Zo = Zo
+        self.max_d_t = []
+        self.max_d_s = []
+        self.max_d_t2 = []
+        self.max_d_s2 = []
 
-        self.t1 = []
-        self.t2 = []
-        
         self.mAvg = 0 
         self.deriv = 0
         self.t_break = 0
@@ -58,6 +61,7 @@ class Data:
         
         self.get_moving_average()
         self.get_deriv()
+        # self.deriv2 = get_deriv(self.t, self.y, 2)
         self.calculate_params()
         self.set_x()
         
@@ -92,10 +96,10 @@ class Data:
         t = self.t
         y = self.y
 
-        after_imax = 6
+        after_imax = 4
 
         if lim_i is None or lim_s is None:
-            lim_i = int(len(y)/10)
+            lim_i = 1 # int(len(y)/10)
             lim_s = len(y)-1
         
         deriv = []
@@ -119,29 +123,43 @@ class Data:
         max1 = np.max(deriv)
 
         deriv = deriv/max1
-        self.deriv = butter_lowpass_filter(deriv, 8, 101, 4)
+        self.deriv = butter_lowpass_filter(deriv, 15, 101, 1)
 
-        # maximum_points = np.where(self.deriv == np.max(self.deriv))
-        #maximum_points = np.where(self.deriv >= self.lim_signal)
-
+        self.deriv = np.abs(self.deriv)
 
         self.t = t[:imax+after_imax]
         self.y = y[:imax+after_imax]
-        self.deriv = deriv[:imax+after_imax]
+        self.deriv = self.deriv[:imax+after_imax]
 
-        maximum_points = get_all_max_points(self.deriv, self.lim_signal)
+        # i_max_min = get_index_of_max_and_min(self.deriv)
+        # i_max_above_lim = get_all_max_points(self.deriv, self.lim_signal)
 
-        print(maximum_points)
-        print(self.deriv[maximum_points])
-        print(self.t[maximum_points])
+        # if i_max_min[-1] == i_max_above_lim[-1]:
+        #    i_max_above_lim = i_max_above_lim[:-1]
 
-        self.t2 = self.deriv[maximum_points]
-        self.t1 = self.t[maximum_points]
+        # print(i_max_min)
+        # print(i_max_above_lim)
+        i_max_above_lim = []
+        i_max_min = []
+        points_of_interest = []
+        for i in range(0, len(i_max_above_lim)):
+            for j in range(0, len(i_max_min)):
+                if i_max_min[j] == i_max_above_lim[i]:
+                    points_of_interest.append(i_max_min[j+1])
+
+        maximum_points = i_max_min
 
 
+        # print(self.deriv[maximum_points])
+        # print(self.t[maximum_points])
 
-        
-        
+        self.max_d_s = self.deriv[maximum_points]
+        self.max_d_t = self.t[maximum_points]
+
+        # self.max_d_s2 = self.deriv[points_of_interest]
+        self.max_d_s2 = self.y[points_of_interest]
+        self.max_d_t2 = self.t[points_of_interest]
+
     def calculate_params(self):
 
         if self.guide_len == 0:
@@ -213,8 +231,9 @@ def plot_array(data_arr, name, figure):
     for data in data_arr:
         ax.plot(data.t, data.y, label=data.name)
         ax.plot(data.t, data.deriv, label=data.name + ": deriv")
-        ax.scatter(data.t1, data.t2, label=data.name + ": max")
-
+        # ax.scatter(data.max_d_t, data.max_d_s, label=data.name + ": max")
+        # ax.scatter(data.max_d_t2, data.max_d_s2, label=data.name + ": max2")
+        # ax.plot(data.t, data.deriv2, label=data.name + ": deriv2")
 
     ax.grid()
     ax.grid(visible=True, which='minor', color='lightgray', linestyle='-')
@@ -224,15 +243,9 @@ def plot_array(data_arr, name, figure):
     # reverse the order
     ax.legend(handles[::-1], labels[::-1])
 
-    #ax2 = ax.twiny()
-    #ax2.set_xlim(ax.get_xlim())
-    # ax2.set_xticks(data_arr[0].t)
-    # ax2.set_xticklabels(data_arr[0].t)
-    # ax2.set_xticks(minor_ticks_t, minor=True)
-
-    #ax2.set_xlabel("length [m]")
     ax.set_xlabel('time [s]')
     ax.set_ylabel(r'$S_{11}$' + " Parameter")
+
 
 def plot_data(ref: Data, data : Data, figure):
     tick = [0, 0]
@@ -260,8 +273,7 @@ def plot_data(ref: Data, data : Data, figure):
     # ax.plot(t,mean)
     
     plt.xlim([0, tick[0]])
-    
-    
+
     def tick_fct(v, tick):
         return ["%.2f" % (v*tk/2) for tk in tick]
     
@@ -328,6 +340,16 @@ def butter_lowpass_filter(data, cutoff, fs, order):
     return y
 
 
+def get_index_of_max_and_min(data):
+    d = np.abs(data)
+    m = []
+    for i in range(1, len(d)-1):
+        if d[i-1] < d[i] > d[i+1] or d[i-1] > d[i] < d[i+1]:
+           m.append(i)
+
+    return m
+
+
 def get_all_max_points(data, limit):
     higher_points = np.where(data >= limit)
 
@@ -343,7 +365,10 @@ def get_all_max_points(data, limit):
 
     maximum_points = []
     for mp in maxp:
-        maximum_points.append(np.median(mp))
+        k = data[mp]
+        ima = np.where(k == np.max(k))
+
+        maximum_points.append(mp[ima[0][0]])
 
     maximum_points = [int(x) for x in maximum_points]
 
@@ -353,4 +378,53 @@ def get_all_max_points(data, limit):
     for i in exceeded_points[0]:
         max.append(maximum_points[i])
 
-    return max
+    return maximum_points
+
+
+def get_statistics(data_arr):
+
+    l_arr = []
+    for data in data_arr:
+        l_arr.append(len(data.y))
+
+    l_max = np.max(l_arr)
+
+    for data in data_arr:
+        if len(data.t) == l_max:
+            t = data.t
+
+    y = []
+    for data in data_arr:
+        y.append(data.y)
+
+    for i in range(0, len(y)):
+        if len(y[i]) < l_max:
+            for j in range(len(y[i]), l_max):
+                y[i] = np.append(y[i], 0)
+
+    # df = DataFrame({'time': t})
+    df = DataFrame()
+
+    for yi in y:
+        df[len(df.columns)] = yi
+
+    df['mean'] = df.mean(axis=1)
+
+    df['sigma'] = df.std(axis=1)
+
+    print(df)
+
+
+def get_deriv(t, y, order):
+    deriv0 = y
+    for n in range(0, order):
+        deriv1 = []
+        for i in range(0, len(deriv0)-1):
+            deriv1.append((deriv0[i + 1] - deriv0[i]) / (t[i + 1] - t[i]))
+        deriv0 = deriv1
+
+    for i in range(0, order):
+        deriv1 = np.append(deriv1, 0)
+
+        deriv1 = deriv1/np.max(deriv1)
+    return deriv1

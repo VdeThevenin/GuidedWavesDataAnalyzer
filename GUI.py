@@ -173,6 +173,8 @@ class GUI:
                     Er = data_to_plot[0].relative_permissivity
                     WS = data_to_plot[0].speed
 
+                    DataPlotter.get_statistics(data_to_plot)
+
                 self.update_param_frame((C, L, Er, WS))
 
                 self.clear_chart()

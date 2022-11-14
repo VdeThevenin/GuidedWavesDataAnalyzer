@@ -17,15 +17,20 @@ def ifft(path, Zo=50):
 
     s11 = cable.s[:, 0, 0]
 
-    s11 = np.append(s11, np.zeros(NFFT-len(s11)))
+    f = cable.frequency.f
+    t_axis = np.linspace(0, 1 / cable.frequency.step, 101)
+    # plt.plot(t_axis, s11)
+    # plt.show()
+
+    # s11 = np.append(s11, np.zeros(NFFT-len(s11)))
 
     window_scale = 1.0 / (NFFT * bessel0_ext(beta * beta / 4.0))
 
     window = np.kaiser(NFFT, 13) * window_scale
     window = window_scale
     s11 = window * s11
-    td1 = sp.fft.ifft(s11, NFFT)
-    td = transform(s11, True)
+    td = sp.fft.ifft(s11, NFFT)
+    td1 = transform(s11, True)
 
     # Create step waveform and compute step response
     step = np.ones(NFFT)
@@ -47,6 +52,7 @@ def ifft(path, Zo=50):
     # idx_pk = np.where(td == pk)[0]
     # print(d_axis[idx_pk[0]])
 
+    td_r = [x*1000 for x in td_r]
     return t_axis, td_r, step_response_Z
 
 

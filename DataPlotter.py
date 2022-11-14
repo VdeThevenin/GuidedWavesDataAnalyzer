@@ -15,56 +15,112 @@ from scipy.signal import butter, filtfilt
 from pandas import DataFrame, date_range
 
 class Data:
-    def __init__(self, path, name, guide_len=1.0, Zo=75.0, s1p=False):
+    def __init__(self, path, name, guide_len=1.0, Zo=75.0, s1p=False, fromdata=False):
+        if not fromdata:
+            if not s1p:
+                with open(path) as csv_file:
+                    csv_reader = csv.reader(csv_file, delimiter=',')
 
-        if not s1p:
-            with open(path) as csv_file:
-                csv_reader = csv.reader(csv_file, delimiter=',')
+                    t = []
+                    y = []
 
-                t = []
-                y = []
+                    for row in csv_reader:
+                        if len(row) < 3 or row[0] == "Time":
+                            pass
+                        else:
+                            t.append(float(row[0]))
+                            y.append(float(row[1]))
+                    z = Zo
+            else:
+                t, y, z = ifft(path, Zo)
 
-                for row in csv_reader:
-                    if len(row) < 3 or row[0] == "Time":
-                        pass
-                    else:
-                        t.append(float(row[0]))
-                        y.append(float(row[1]))
-                z = Zo
+            self.name = name
+            self.t = t
+            self.y = butter_lowpass_filter(y, 30, 101, 2)
+            self.z = z
+            self.x = 0
+            self.lim_signal = 0.08
+            self.guide_len = guide_len
+            self.Zo = Zo
+            self.max_d_t = []
+            self.max_d_s = []
+            self.max_d_t2 = []
+            self.max_d_s2 = []
+
+            self.mAvg = 0
+            self.deriv = 0
+            self.t_break = 0
+            self.y_break = 0
+            self.imax = 0
+            self.diff_positions = []
+
+            self.inductance = 0
+            self.capacitance = 0
+            self.speed = 0
+            self.relative_permissivity = 0
+
+            self.get_moving_average()
+            self.get_deriv()
+            # self.deriv2 = get_deriv(self.t, self.y, 2)
+            self.calculate_params()
+            self.set_x()
         else:
-            t, y, z = ifft(path, Zo)
-        
-        self.name = name
-        self.t = t
-        self.y = butter_lowpass_filter(y, 30, 101, 2)
-        self.z = z
+            self.name = "name"
+            self.t = 0
+            self.y = 0
+            self.z = 0
+            self.x = 0
+            self.lim_signal = 0
+            self.guide_len = 0
+            self.Zo = 0
+            self.max_d_t = []
+            self.max_d_s = []
+            self.max_d_t2 = []
+            self.max_d_s2 = []
+
+            self.mAvg = 0
+            self.deriv = 0
+            self.t_break = 0
+            self.y_break = 0
+            self.imax = 0
+            self.diff_positions = []
+
+            self.inductance = 0
+            self.capacitance = 0
+            self.speed = 0
+            self.relative_permissivity = 0
+
+    def from_data(self, time, signal, deriv):
+        self.name = "name"
+        self.t = time
+        self.y = signal
+        self.z = 0
         self.x = 0
-        self.lim_signal = 0.08
-        self.guide_len = guide_len
-        self.Zo = Zo
+        self.lim_signal = 0
+        self.guide_len = 1
+        self.Zo = 1
         self.max_d_t = []
         self.max_d_s = []
         self.max_d_t2 = []
         self.max_d_s2 = []
 
-        self.mAvg = 0 
-        self.deriv = 0
-        self.t_break = 0
-        self.y_break = 0
+        self.mAvg = 0
+        self.deriv = deriv
+        self.t_break = 1
+        self.y_break = 1
         self.imax = 0
         self.diff_positions = []
-        
+
         self.inductance = 0
         self.capacitance = 0
         self.speed = 0
         self.relative_permissivity = 0
-        
-        self.get_moving_average()
-        self.get_deriv()
-        # self.deriv2 = get_deriv(self.t, self.y, 2)
-        self.calculate_params()
-        self.set_x()
-        
+
+        # self.get_moving_average()
+        # self.calculate_params()
+        # self.set_x()
+
+
     def get_moving_average(self, wsz = 70):
         window_size = wsz
         y = self.y
@@ -161,7 +217,6 @@ class Data:
         self.max_d_t2 = self.t[points_of_interest]
 
     def calculate_params(self):
-
         if self.guide_len == 0:
             self.guide_len = 1e-25
         if self.Zo == 0:
@@ -230,7 +285,7 @@ def plot_array(data_arr, name, figure):
 
     for data in data_arr:
         ax.plot(data.t, data.y, label=data.name)
-        ax.plot(data.t, data.deriv, label=data.name + ": deriv")
+        # ax.plot(data.t[:-1], data.deriv, label=data.name + ": deriv")
         # ax.scatter(data.max_d_t, data.max_d_s, label=data.name + ": max")
         # ax.scatter(data.max_d_t2, data.max_d_s2, label=data.name + ": max2")
         # ax.plot(data.t, data.deriv2, label=data.name + ": deriv2")
@@ -402,6 +457,7 @@ def get_statistics(data_arr):
             for j in range(len(y[i]), l_max):
                 y[i] = np.append(y[i], 0)
 
+
     # df = DataFrame({'time': t})
     df = DataFrame()
 
@@ -412,6 +468,32 @@ def get_statistics(data_arr):
 
     df['sigma'] = df.std(axis=1)
 
+    offset = []
+    for (index, colname) in enumerate(df):
+        offset.append(df[colname].iloc[0]-df[0].iloc[0])
+
+    for (index, colname) in enumerate(df):
+        df[colname] -= offset[index]
+
+    df.drop('mean', axis=1, inplace=True)
+    df.drop('sigma', axis=1, inplace=True)
+
+    df['mean'] = df.mean(axis=1)
+    df['sigma'] = df.std(axis=1)
+
+    i=0
+    for k in range(0, len(data_arr)):
+        data_arr[k].y = df[i].to_numpy()
+        i+=1
+
+    for k in range(0, len(data_arr)):
+        while len(data_arr[k].t) < len(data_arr[k].y):
+            data_arr[k].t = np.append(data_arr[k].t, 0)
+        # data_arr[k].calculate_params()
+
+    d = Data('','',0,0,0,True)
+    d.from_data(time=data_arr[0].t, signal=df['mean'].to_numpy(), deriv=df['mean'].to_numpy())
+    data_arr.append(d)
     print(df)
 
 

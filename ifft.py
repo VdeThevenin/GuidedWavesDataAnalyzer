@@ -8,21 +8,14 @@ from fft import transform
 from ctypes import *
 
 
-def ifft(path, Zo=50):
+def ifft(cable, Zo=50):
     raw_points = 101
     NFFT = 256
     beta = 0
 
-    cable = rf.Network(path)
-
     s11 = cable.s[:, 0, 0]
 
     f = cable.frequency.f
-    t_axis = np.linspace(0, 1 / cable.frequency.step, 101)
-    # plt.plot(t_axis, s11)
-    # plt.show()
-
-    # s11 = np.append(s11, np.zeros(NFFT-len(s11)))
 
     window_scale = 1.0 / (NFFT * bessel0_ext(beta * beta / 4.0))
 

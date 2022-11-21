@@ -32,7 +32,8 @@ class Data:
                             y.append(float(row[1]))
                     z = Zo
             else:
-                t, y, z = ifft(path, Zo)
+                cable = rf.Network(path)
+                t, y, z = ifft(cable, Zo)
 
             self.name = name
             self.t = t

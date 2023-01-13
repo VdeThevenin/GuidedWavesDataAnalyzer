@@ -37,8 +37,7 @@ def ifft(path, Zo=50):
 
     # td = cable.s11.time_gate(center=0, span=.2, t_unit='ns')
 
-    td = np.abs(np.fft.ifft(s11, NFFT))
-
+    td = np.fft.ifft(s11, NFFT)
     # td = transform(s11, True)
 
     # s11 = cable.s[:, 0, 0]
@@ -59,12 +58,12 @@ def ifft(path, Zo=50):
     fc = 2.3  # Cut-off frequency of the filter
     w = fc / (fs / 2)  # Normalize the frequency
     b, a = signal.butter(5, w, 'low')
-    tdk = np.abs(signal.filtfilt(b, a, td))
+    tdk = signal.filtfilt(b, a, td)
     m = get_moving_average(tdk, round(len(tdk)/2))# mean(np.abs(tdk))
 
     m = np.mean(m)
 
-    td_a = [np.abs(x)-m for x in td]
+    td_a = [x-m for x in td]
     td_m = [m for x in td_a]
     # Calculate maximum time axis
     t_axis = np.linspace(0, 1 / cable.frequency.step, NFFT)
@@ -76,11 +75,11 @@ def ifft(path, Zo=50):
 
     # td_2 = [abs(x)*1000 for x in td]
     # td = [np.abs(x) for x in tdk]
-    td_x = [np.abs(x) for x in td_r]
+    td_r = [2*x for x in td_r]
 
 
 
-    return t_axis, td_r, td, step_response_Z
+    return t_axis, td_r, td_m, step_response_Z
 
 def bessel0_ext(x_pow_2):
     div = [1/4.0,   1/9.0,   1/16.0,

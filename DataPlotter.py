@@ -292,7 +292,7 @@ def plot_array(data_arr, name, figure):
 
     for data in data_arr:
         ax.plot(data.t, data.y, label=data.name)
-        #ax.plot(data.t, data.y_r)
+        ax.plot(data.t, data.y_r)
         # ax.plot(data.t[:-1], data.deriv, label=data.name + ": deriv")
         # ax.scatter(data.max_d_t, data.max_d_s, label=data.name + ": max")
         # ax.scatter(data.max_d_t2, data.max_d_s2, label=data.name + ": max2")

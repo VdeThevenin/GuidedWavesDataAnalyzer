@@ -32,12 +32,12 @@ class Data:
                             y.append(float(row[1]))
                     z = Zo
             else:
-                cable = rf.Network(path)
-                t, y, z = ifft(cable, Zo)
+                t, y, y_r, z = ifft(path, Zo)
 
             self.name = name
             self.t = t
-            self.y = butter_lowpass_filter(y, 30, 101, 2)
+            self.y = y
+            self.y_r = y_r
             self.z = z
             self.x = 0
             self.lim_signal = 0.08
@@ -61,7 +61,7 @@ class Data:
             self.relative_permissivity = 0
 
             self.get_moving_average()
-            self.get_deriv()
+            # self.get_deriv()
             # self.deriv2 = get_deriv(self.t, self.y, 2)
             self.calculate_params()
             self.set_x()
@@ -69,6 +69,7 @@ class Data:
             self.name = "name"
             self.t = 0
             self.y = 0
+            self.y_r = 0
             self.z = 0
             self.x = 0
             self.lim_signal = 0
@@ -95,6 +96,7 @@ class Data:
         self.name = "name"
         self.t = time
         self.y = signal
+        self.y_r = signal
         self.z = 0
         self.x = 0
         self.lim_signal = 0
@@ -121,10 +123,10 @@ class Data:
         # self.calculate_params()
         # self.set_x()
 
-
-    def get_moving_average(self, wsz = 70):
+    def get_moving_average(self, y=None, wsz=70):
         window_size = wsz
-        y = self.y
+        if y is None:
+            y = self.y
         
         i = 0
         # Initialize an empty list to store moving averages
@@ -152,8 +154,6 @@ class Data:
     def get_deriv(self, lim_i=None, lim_s=None):
         t = self.t
         y = self.y
-
-        after_imax = 4
 
         if lim_i is None or lim_s is None:
             lim_i = 1 # int(len(y)/10)
@@ -184,8 +184,10 @@ class Data:
 
         self.deriv = np.abs(self.deriv)
 
-        self.t = t[:imax+after_imax]
-        self.y = y[:imax+after_imax]
+        after_imax = 101 - imax
+
+        # self.t = t[:imax+after_imax]
+        # self.y = y[:imax+after_imax]
         self.deriv = self.deriv[:imax+after_imax]
 
         # i_max_min = get_index_of_max_and_min(self.deriv)
@@ -214,14 +216,18 @@ class Data:
         self.max_d_t = self.t[maximum_points]
 
         # self.max_d_s2 = self.deriv[points_of_interest]
-        self.max_d_s2 = self.y[points_of_interest]
-        self.max_d_t2 = self.t[points_of_interest]
+        # self.max_d_s2 = self.y[points_of_interest]
+        # self.max_d_t2 = self.t[points_of_interest]
 
     def calculate_params(self):
         if self.guide_len == 0:
             self.guide_len = 1e-25
         if self.Zo == 0:
             self.Zo = 1e-25
+
+        if self.t_break == 0:
+            self.t_break = 1
+
         self.speed = (2*self.guide_len)/self.t_break
                     
         self.capacitance = 1/(self.Zo*self.speed)
@@ -286,6 +292,7 @@ def plot_array(data_arr, name, figure):
 
     for data in data_arr:
         ax.plot(data.t, data.y, label=data.name)
+        #ax.plot(data.t, data.y_r)
         # ax.plot(data.t[:-1], data.deriv, label=data.name + ": deriv")
         # ax.scatter(data.max_d_t, data.max_d_s, label=data.name + ": max")
         # ax.scatter(data.max_d_t2, data.max_d_s2, label=data.name + ": max2")
@@ -453,10 +460,10 @@ def get_statistics(data_arr):
     for data in data_arr:
         y.append(data.y)
 
-    for i in range(0, len(y)):
-        if len(y[i]) < l_max:
-            for j in range(len(y[i]), l_max):
-                y[i] = np.append(y[i], 0)
+    # for i in range(0, len(y)):
+    #    if len(y[i]) < l_max:
+    #        for j in range(len(y[i]), l_max):
+    #            y[i] = np.append(y[i], 0)
 
 
     # df = DataFrame({'time': t})

@@ -8,7 +8,6 @@ import glob
 import csv
 import DataPlotter
 from DataPlotter import Data
-from DataPlotter2 import Data2
 from ZoomPan import ZoomPan
 # import Plots
 
@@ -83,7 +82,7 @@ class GUI:
             [sg.Button('Plot', key='plot_bt'), sg.Quit('Sair')],
         ]
 
-        self._VARS['window'] = sg.Window('Guided Waves TDR Data Analyzer', layout, finalize=True, return_keyboard_events=True)
+        self._VARS['window'] = sg.Window('GUIded Waves TDR Data Analyzer', layout, finalize=True, return_keyboard_events=True)
 
     def start(self):
         self.draw_chart()
@@ -92,8 +91,6 @@ class GUI:
         selected = []
         data_to_plot = []
         zp = ZoomPan()
-        figZoom = zp.zoom_factory(base_scale=1.1)
-        figPan = zp.pan_factory(plt.gca())
 
         while True:
             event, self._VARS['values'] = self._VARS['window'].Read()
@@ -109,11 +106,17 @@ class GUI:
                 for tp in types:
                     files.extend(glob.glob(glob.escape(p) + tp))
 
+                # initial_data = Data(f, "INITIAL",2.0)
+
                 for file in files:
                     names_arr.append(file[file.rfind('\\')+1:])
 
                 self._VARS['window']['ListBox'].Update(values=names_arr)
 
+                # DataPlotter.plot_data(initial_data, data_arr[0], self._VARS['pltFig'])
+                # Plots.import_data_and_print("INITIAL", files[self._VARS['fig_index']], self._VARS['pltFig'])
+                # self.update_chart()
+                pass
             elif event == 'gLenInput' or event == 'zoInput':
 
                 glen = validate_field_value(self._VARS['values']['gLenInput'])
@@ -121,7 +124,6 @@ class GUI:
                 zo = validate_field_value(self._VARS['values']['zoInput'])
                 self._VARS['window']['zoInput'].Update(value=zo)
 
-                '''
                 Er = 0
 
                 if len(data_to_plot) != 0:
@@ -141,15 +143,17 @@ class GUI:
                         Er = data_to_plot[0].relative_permissivity
                         WS = data_to_plot[0].speed
                         self.update_param_frame((C, L, Er, WS))
-                '''
+
             elif event == 'plot_bt':
                 data_to_plot = []
                 selected = self._VARS['window']['ListBox'].get_indexes()
 
                 gLen = float(self._VARS['values']['gLenInput'])
                 Zo = float(self._VARS['values']['zoInput'])
-
-                dt = Data2(1, 75)
+                C = (0, " \u03BCF")
+                L = (0, "mH")
+                Er = 0
+                WS = 0
 
                 for i in selected:
                     s1p = False
@@ -157,12 +161,30 @@ class GUI:
                         s1p = True
 
                     data_to_plot.append(Data(files[i], names_arr[i], gLen, Zo, s1p))
+                    if names_arr[i].__contains__("ORIG"):
+                        C = DataPlotter.set_unit_prefix(data_to_plot[-1].capacitance, "F")
+                        L = DataPlotter.set_unit_prefix(data_to_plot[-1].inductance, "H")
+                        Er = data_to_plot[-1].relative_permissivity
+                        WS = data_to_plot[-1].speed
 
-                    dt.append_s1p(files[i], names_arr[i])
+                if Er == 0:
+                    C = DataPlotter.set_unit_prefix(data_to_plot[0].capacitance, "F")
+                    L = DataPlotter.set_unit_prefix(data_to_plot[0].inductance, "H")
+                    Er = data_to_plot[0].relative_permissivity
+                    WS = data_to_plot[0].speed
 
+                    DataPlotter.get_statistics(data_to_plot)
 
-                self.plot_chart(data_to_plot)
+                self.update_param_frame((C, L, Er, WS))
 
+                self.clear_chart()
+
+                DataPlotter.plot_array(data_to_plot, "teste.py", self._VARS['pltFig'])
+
+                self.update_chart()
+
+                figZoom = zp.zoom_factory(base_scale=1.1)
+                figPan = zp.pan_factory(plt.gca())
             elif event == 'MouseWheel:Up':
                 pass
             elif event == 'MouseWheel:Down':
@@ -180,19 +202,37 @@ class GUI:
 
     def draw_chart(self, **styles):
         self._VARS['pltFig'] = pp.figure()
+        self._prepare_plot(**styles)
         self._VARS['fig_agg'] = self.draw_figure(self._VARS['window']['canvas'].TKCanvas, self._VARS['pltFig'])
 
     def update_chart(self, **styles):
         self._VARS['fig_agg'].get_tk_widget().forget()
+        # pp.clf()
+        self._prepare_plot(**styles)
         self._VARS['fig_agg'] = self.draw_figure(self._VARS['window']['canvas'].TKCanvas, self._VARS['pltFig'])
 
     def clear_chart(self):
         pp.clf()
 
-    def plot_chart(self, data_to_plot):
-        self.clear_chart()
-        DataPlotter.plot_array(data_to_plot, "teste", self._VARS['pltFig'])
-        self.update_chart()
+    def _prepare_plot(self, **styles):
+        if len(self.data) == 0:
+            return
+
+        for d in self.data:
+            if d[2] == 'original data':
+                pp.plot(d[0], d[1], label=d[2])
+                self._PLOT_PARAM['y_max'] = 1.1*np.max(d[1])
+                self._PLOT_PARAM['y_min'] = np.min(d[1]) - 0.01*np.max(d[1])
+            else:
+                pp.plot(d[0], d[1], label=d[2])
+
+        pp.grid(self._PLOT_PARAM['grid'])
+        pp.title(self._PLOT_PARAM['title'])
+        pp.xlabel(self._PLOT_PARAM['x_label'])
+        pp.ylabel(self._PLOT_PARAM['y_label'])
+        pp.ylim(ymax=self._PLOT_PARAM['y_max'], ymin=self._PLOT_PARAM['y_min'])
+        self._PLOT_PARAM['y_label']
+        pp.legend(loc='upper left', prop={'size': 6})
 
     def get_data(self):
         p = self._VARS['values']['FolderSelected']

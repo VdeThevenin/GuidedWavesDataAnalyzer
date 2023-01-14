@@ -8,89 +8,17 @@ Created on Tue Oct 25 09:59:03 2022
 import csv
 import numpy as np
 import matplotlib.pyplot as plt
-import skrf as rf
+from Snapshot import Snapshot
 from matplotlib.ticker import FormatStrFormatter
-from ifft import ifft
 from scipy.signal import butter, filtfilt
-from pandas import DataFrame, date_range
+from pandas import DataFrame
 
 class Data:
-    def __init__(self, path, name, guide_len=1.0, Zo=75.0, s1p=False, fromdata=False):
-        if not fromdata:
-            if not s1p:
-                with open(path) as csv_file:
-                    csv_reader = csv.reader(csv_file, delimiter=',')
+    def __init__(self):
+        self.time_domain = DataFrame()
 
-                    t = []
-                    y = []
-
-                    for row in csv_reader:
-                        if len(row) < 3 or row[0] == "Time":
-                            pass
-                        else:
-                            t.append(float(row[0]))
-                            y.append(float(row[1]))
-                    z = Zo
-            else:
-                t, y, y_r, z = ifft(path, Zo)
-
-            self.name = name
-            self.t = t
-            self.y = y
-            self.y_r = y_r
-            self.z = z
-            self.x = 0
-            self.lim_signal = 0.08
-            self.guide_len = guide_len
-            self.Zo = Zo
-            self.max_d_t = []
-            self.max_d_s = []
-            self.max_d_t2 = []
-            self.max_d_s2 = []
-
-            self.mAvg = 0
-            self.deriv = 0
-            self.t_break = 0
-            self.y_break = 0
-            self.imax = 0
-            self.diff_positions = []
-
-            self.inductance = 0
-            self.capacitance = 0
-            self.speed = 0
-            self.relative_permissivity = 0
-
-            self.get_moving_average()
-            # self.get_deriv()
-            # self.deriv2 = get_deriv(self.t, self.y, 2)
-            self.calculate_params()
-            self.set_x()
-        else:
-            self.name = "name"
-            self.t = 0
-            self.y = 0
-            self.y_r = 0
-            self.z = 0
-            self.x = 0
-            self.lim_signal = 0
-            self.guide_len = 0
-            self.Zo = 0
-            self.max_d_t = []
-            self.max_d_s = []
-            self.max_d_t2 = []
-            self.max_d_s2 = []
-
-            self.mAvg = 0
-            self.deriv = 0
-            self.t_break = 0
-            self.y_break = 0
-            self.imax = 0
-            self.diff_positions = []
-
-            self.inductance = 0
-            self.capacitance = 0
-            self.speed = 0
-            self.relative_permissivity = 0
+    def add_snapshot(self, ss: Snapshot):
+        pass
 
     def from_data(self, time, signal, deriv):
         self.name = "name"

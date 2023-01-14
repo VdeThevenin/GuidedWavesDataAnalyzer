@@ -6,10 +6,9 @@ from matplotlib import pyplot as pp
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
 import glob
 import csv
-import DataPlotter
-from DataPlotter import Data
 from ZoomPan import ZoomPan
-# import Plots
+from Frame import *
+from Snapshot import Snapshot
 
 
 class GUI:
@@ -26,6 +25,7 @@ class GUI:
                             'y_min': False,
                             'y_max': False}
         self.data = []
+        self.frames = []
         self.c_mean = 0
         self.func = None
         self.styles = {'first data': 'k-'}
@@ -69,7 +69,6 @@ class GUI:
                                       use_readonly_for_disable=True,
                                       disabled=True,
                                       key='RPOutput')]]
-        folder_frame = []
 
         layout = [
             [sg.Text('Root Folder:', size=(15, 0)),
@@ -82,13 +81,14 @@ class GUI:
             [sg.Button('Plot', key='plot_bt'), sg.Quit('Sair')],
         ]
 
-        self._VARS['window'] = sg.Window('GUIded Waves TDR Data Analyzer', layout, finalize=True, return_keyboard_events=True)
+        self._VARS['window'] = sg.Window('GUIded Waves TDR Data Analyzer',
+                                         layout,
+                                         finalize=True,
+                                         return_keyboard_events=True)
 
     def start(self):
         self.draw_chart()
         names_arr = []
-        data_arr = []
-        selected = []
         data_to_plot = []
         zp = ZoomPan()
 
@@ -101,22 +101,16 @@ class GUI:
                 names_arr = []
                 p = self._VARS['values']['FolderSelected']
 
-                types = ('/*.csv', '/*.s1p')  # the tuple of file types
+                types = ('.null', '/*.s1p')  # the tuple of file types
                 files = []
                 for tp in types:
                     files.extend(glob.glob(glob.escape(p) + tp))
-
-                # initial_data = Data(f, "INITIAL",2.0)
 
                 for file in files:
                     names_arr.append(file[file.rfind('\\')+1:])
 
                 self._VARS['window']['ListBox'].Update(values=names_arr)
 
-                # DataPlotter.plot_data(initial_data, data_arr[0], self._VARS['pltFig'])
-                # Plots.import_data_and_print("INITIAL", files[self._VARS['fig_index']], self._VARS['pltFig'])
-                # self.update_chart()
-                pass
             elif event == 'gLenInput' or event == 'zoInput':
 
                 glen = validate_field_value(self._VARS['values']['gLenInput'])
@@ -124,28 +118,32 @@ class GUI:
                 zo = validate_field_value(self._VARS['values']['zoInput'])
                 self._VARS['window']['zoInput'].Update(value=zo)
 
-                Er = 0
+                if len(self.frames) > 0:
+                    f0 = self.frames[0]
 
-                if len(data_to_plot) != 0:
-                    for data in data_to_plot:
-                        data.set_GuideLen(float(glen))
-                        data.set_Zo(float(zo))
-                        if data_to_plot.index(data) == 0:
-                            C = DataPlotter.set_unit_prefix(data.capacitance, "F")
-                            L = DataPlotter.set_unit_prefix(data.inductance, "H")
-                            Er = data.relative_permissivity
-                            WS = data.speed
-                            self.update_param_frame((C, L, Er, WS))
+                    C, L, WS, Er = calculate_params(float(zo), f0.cable.t_break, float(glen))
 
-                    if Er == 0:
-                        C = DataPlotter.set_unit_prefix(data_to_plot[0].capacitance, "F")
-                        L = DataPlotter.set_unit_prefix(data_to_plot[0].inductance, "H")
-                        Er = data_to_plot[0].relative_permissivity
-                        WS = data_to_plot[0].speed
-                        self.update_param_frame((C, L, Er, WS))
+                    C = set_unit_prefix(C, "F")
+                    L = set_unit_prefix(L, "H")
+
+                else:
+                    C = (0, " \u03BCF")
+                    L = (0, "mH")
+                    Er = 0
+                    WS = 0
+
+                self.update_param_frame((C, L, Er, WS))
+
+                self.clear_chart()
+
+                for frame in self.frames:
+                    frame.update(C, L, WS, Er)
+                    frame.plot(self._VARS['pltFig'])
+
+                self.update_chart()
 
             elif event == 'plot_bt':
-                data_to_plot = []
+                snapshots = []
                 selected = self._VARS['window']['ListBox'].get_indexes()
 
                 gLen = float(self._VARS['values']['gLenInput'])
@@ -156,30 +154,26 @@ class GUI:
                 WS = 0
 
                 for i in selected:
-                    s1p = False
-                    if files[i].__contains__(".s1p") or files[i].__contains__(".S1P"):
-                        s1p = True
+                        snapshots.append(Snapshot(files[i], names_arr[i]))
 
-                    data_to_plot.append(Data(files[i], names_arr[i], gLen, Zo, s1p))
-                    if names_arr[i].__contains__("ORIG"):
-                        C = DataPlotter.set_unit_prefix(data_to_plot[-1].capacitance, "F")
-                        L = DataPlotter.set_unit_prefix(data_to_plot[-1].inductance, "H")
-                        Er = data_to_plot[-1].relative_permissivity
-                        WS = data_to_plot[-1].speed
+                frame = Frame(Zo, gLen)
+                frame.add_snapshots_list(snapshots)
+                frame.run()
 
-                if Er == 0:
-                    C = DataPlotter.set_unit_prefix(data_to_plot[0].capacitance, "F")
-                    L = DataPlotter.set_unit_prefix(data_to_plot[0].inductance, "H")
-                    Er = data_to_plot[0].relative_permissivity
-                    WS = data_to_plot[0].speed
+                C, L, WS, Er = calculate_params(Zo, frame.cable.t_break, gLen)
 
-                    DataPlotter.get_statistics(data_to_plot)
+                C = set_unit_prefix(C, "F")
+                L = set_unit_prefix(L, "H")
 
                 self.update_param_frame((C, L, Er, WS))
 
                 self.clear_chart()
 
-                DataPlotter.plot_array(data_to_plot, "teste.py", self._VARS['pltFig'])
+                frame.update(C, L, WS, Er)
+
+                frame.plot(self._VARS['pltFig'])
+
+                self.frames.append(frame)
 
                 self.update_chart()
 
@@ -298,6 +292,24 @@ def validate_field_value(newval : str):
             return 0
     else:
         return newval
+
+
+def calculate_params(zo, t_break, length):
+    if not t_break > 0:
+        raise ValueError("t_break must be greater than 0")
+
+    speed = (2 * length) / t_break
+
+    c = 1 / (zo * speed)
+
+    l = 1 / (c * speed ** 2)
+
+    e0 = 8.85e-12
+    u0 = 4 * np.pi * 1e-7
+
+    rp = 1 / (speed ** 2 * e0 * u0)
+
+    return c, l, speed, rp
 
 tela = GUI()
 tela.start()

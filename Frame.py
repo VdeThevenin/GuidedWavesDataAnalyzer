@@ -71,15 +71,17 @@ class Frame:
         self.set_x()
 
     def plot(self, figure):
-        self.set_plot_lim()
+        # self.set_plot_lim()
 
         # self.dtdr_dt.append(0)
-        t0, y0 = frame_analysis(self, self)
+        ilim = self.imax
+
+        t0, y0 = frame_analysis(self, self, ilim)
         figure.suptitle(self.name, x=0.2, y=0.98)
         plt.tight_layout()
         ax = figure.add_subplot(1, 1, 1)
-        ax.plot(self.x, self.average[0], label=self.name)
-        ax.plot(self.x, self.dtdr_dt)
+        ax.plot(self.x[:ilim], self.average[0][:ilim], label=self.name)
+        ax.plot(self.x[:ilim], self.dtdr_dt[:ilim])
         ax.scatter(t0, y0)
         ax.grid()
         ax.grid(visible=True, which='minor', color='lightgray', linestyle='-')
@@ -112,12 +114,14 @@ def plot_frames(frames, figure, name):
     plt.tight_layout()
     ax = figure.add_subplot(1, 1, 1)
 
-    for frame in frames:
-        frame.set_plot_lim()
-        ax.plot(frame.x, frame.average[0], label=frame.name)
+    ilim = frames[0].imax
 
-    t0, y0 = frame_analysis(frames[0], frames[-1])
-    ax.scatter(t0, y0, label="detected")
+    for frame in frames:
+        # frame.set_plot_lim()
+        ax.plot(frame.x[:ilim], frame.average[0][:ilim], label=frame.name)
+
+    t0, y0 = frame_analysis(frames[0], frames[-1], ilim)
+    ax.scatter(t0[:ilim], y0[:ilim], label="detected")
 
     ax.grid()
     ax.grid(visible=True, which='minor', color='lightgray', linestyle='-')
@@ -158,21 +162,22 @@ def set_unit_prefix(value, main_unit):
         return a, (d_arr[d]+main_unit)
 
 
-def frame_analysis(f0:Frame,f1:Frame):
+def frame_analysis(f0:Frame,f1:Frame, ilim):
     dmin = 0.25
     diffmin = 0.02
-    x = f1.x
-    y0 = f0.average[0]
-    y1 = f1.average[0]
-    dy1 = f1.dtdr_dt
+    x = f1.x[:ilim]
+    y0 = f0.average[0][:ilim]
+    y1 = f1.average[0][:ilim]
+    dy1 = f1.dtdr_dt[:ilim]
     d2y1 = derivate(x, dy1)
     d2y1 = [-d for d in d2y1]
+    d2y1 = d2y1[:ilim]
     indexes = []
     for i in range(1, len(d2y1)-1):
         if d2y1[i-1] < d2y1[i] > d2y1[i+1] and d2y1[i] > dmin and (y1[i]-y0[i]) > diffmin:
             indexes.append(i)
 
-    return x[indexes], y1[indexes]
+    return np.array(x[indexes]), np.array(y1[indexes])
 
 
 def derivate(x, y):

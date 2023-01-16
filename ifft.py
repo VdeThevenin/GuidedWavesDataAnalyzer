@@ -27,7 +27,7 @@ def ifft(s1p, nfft=2**14, raw=False):
     b, a = signal.butter(5, w, 'low')
     tdk = signal.filtfilt(b, a, td)
     m = get_moving_average(tdk, round(len(tdk)/2))
-    m = np.mean(m)
+    m = np.mean(m)/2
 
     td_a = [x-m for x in td]
 

@@ -1,7 +1,6 @@
+import datetime
 from os import path
 import PySimpleGUI as sg
-import matplotlib.pyplot as plt
-import numpy as np
 from matplotlib import pyplot as pp
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
 import glob
@@ -9,13 +8,14 @@ import csv
 from ZoomPan import ZoomPan
 from Frame import *
 from Snapshot import Snapshot
-
+from NVSerial import *
 
 class GUI:
     def __init__(self):
         self._VARS = {'window': False,
                       'fig_agg': False,
                       'pltFig': False,
+                      'axFig': False,
                       'values': [],
                       'fig_index': 0}
         self._PLOT_PARAM = {'title': False,
@@ -92,6 +92,37 @@ class GUI:
         data_to_plot = []
         zp = ZoomPan()
 
+        nanovna = NVSerial()
+        nanovna.open()
+        nanovna.set_frequencies(1e6, 1200e6,101)
+
+        # gLen = float(self._VARS['values']['gLenInput'])
+        # Zo = float(self._VARS['values']['zoInput'])
+        C = (0, " \u03BCF")
+        L = (0, "mH")
+        Er = 0
+        WS = 0
+        Zo = 75
+        gLen = 2.92
+        frame = set_frame(nanovna, Zo, gLen)
+
+        C, L, WS, Er = calculate_params(Zo, frame.cable.t_break, gLen)
+
+        C = set_unit_prefix(C, "F")
+        L = set_unit_prefix(L, "H")
+
+        self.update_param_frame((C, L, Er, WS))
+
+        self.clear_chart()
+
+        frame.update(C, L, WS, Er)
+
+        frame.plot(self._VARS['pltFig'])
+
+        self.frames.append(frame)
+
+        self.update_chart()
+
         while True:
             event, self._VARS['values'] = self._VARS['window'].Read()
 
@@ -138,42 +169,28 @@ class GUI:
 
                 for frame in self.frames:
                     frame.update(C, L, WS, Er)
-                    frame.plot(self._VARS['pltFig'])
+
+                plot_frames(self.frames,self._VARS['pltFig'], "teste2")
 
                 self.update_chart()
-
+                figZoom = zp.zoom_factory(base_scale=1.1)
+                figPan = zp.pan_factory(plt.gca())
             elif event == 'plot_bt':
-                snapshots = []
-                selected = self._VARS['window']['ListBox'].get_indexes()
 
                 gLen = float(self._VARS['values']['gLenInput'])
                 Zo = float(self._VARS['values']['zoInput'])
-                C = (0, " \u03BCF")
-                L = (0, "mH")
-                Er = 0
-                WS = 0
 
-                for i in selected:
-                        snapshots.append(Snapshot(files[i], names_arr[i]))
-
-                frame = Frame(Zo, gLen)
-                frame.add_snapshots_list(snapshots)
-                frame.run()
-
-                C, L, WS, Er = calculate_params(Zo, frame.cable.t_break, gLen)
-
-                C = set_unit_prefix(C, "F")
-                L = set_unit_prefix(L, "H")
-
-                self.update_param_frame((C, L, Er, WS))
+                frame = set_frame(nanovna, Zo, gLen)
 
                 self.clear_chart()
 
                 frame.update(C, L, WS, Er)
 
-                frame.plot(self._VARS['pltFig'])
-
                 self.frames.append(frame)
+
+                plot_frames(self.frames, self._VARS['pltFig'], "teste1")
+                # for f in self.frames:
+                # f.plot(self._VARS['pltFig'])
 
                 self.update_chart()
 
@@ -196,6 +213,7 @@ class GUI:
 
     def draw_chart(self, **styles):
         self._VARS['pltFig'] = pp.figure()
+        # self._VARS['axFig'] = self._VARS['pltFig'].add_subplot(1, 1, 1)
         self._prepare_plot(**styles)
         self._VARS['fig_agg'] = self.draw_figure(self._VARS['window']['canvas'].TKCanvas, self._VARS['pltFig'])
 
@@ -293,6 +311,24 @@ def validate_field_value(newval : str):
     else:
         return newval
 
+
+def set_frame(nanovna:NVSerial, zo, l):
+    from datetime import datetime
+    SNAPSHOTS_PER_FRAME = 10
+    ss_list = []
+    for i in range(0, SNAPSHOTS_PER_FRAME):
+        data = nanovna.scan()
+        now = datetime.now()  # current date and time
+        name = datetime.timestamp(now)
+        ss = Snapshot(data, name)
+        ss_list.append(ss)
+        time.sleep(0.1)
+
+    f = Frame(zo, l)
+    f.add_snapshots_list(ss_list)
+    f.run()
+
+    return f
 
 def calculate_params(zo, t_break, length):
     if not t_break > 0:

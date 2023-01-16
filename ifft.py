@@ -4,10 +4,15 @@ import numpy as np
 from scipy import signal
 
 
-def ifft(path, nfft=2**14):
+def ifft(s1p, nfft=2**14, raw=False):
 
-    cable = rf.Network(path)
-    s11 = cable.s[:, 0, 0]
+    # if not raw:
+    #    cable = rf.Network(s1p)
+    #    s11 = cable.s[:, 0, 0]
+    # else:
+    s11 = s1p[0]
+    s21 = s1p[1]
+    freqs = s1p[2]
 
     td = sp.fft.ifft(s11, nfft)
 
@@ -25,7 +30,9 @@ def ifft(path, nfft=2**14):
     m = np.mean(m)
 
     td_a = [x-m for x in td]
-    t_axis = np.linspace(0, 1 / cable.frequency.step, nfft)
+
+
+    t_axis = np.linspace(0, 1 / (freqs[1]-freqs[0]), nfft)
 
     td_r = [x for x in td_a]
     for i in range(1, len(td_r)):

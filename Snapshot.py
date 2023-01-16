@@ -2,9 +2,9 @@ from ifft import ifft
 
 
 class Snapshot:
-    def __init__(self, s1p_path, name):
+    def __init__(self, s1p, name):
         self.name = name
-        self.t, self.s11, self.z = ifft(s1p_path, nfft=1001)
+        self.t, self.s11, self.z = ifft(s1p, nfft=1001)
 
     def get_time(self):
         return self.t

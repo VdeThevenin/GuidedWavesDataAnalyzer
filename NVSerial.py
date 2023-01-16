@@ -1,12 +1,11 @@
 import time
-
 import serial
 import numpy as np
 from serial.tools import list_ports
 
 VIDPIDs = set([(0x0483, 0x5740), (0x04b4, 0x0008)])
-
-class Serial:
+REF_LEVEL = (1<<9)
+class NVSerial:
     def __init__(self, dev=None):
         self.dev = dev or getport()
         self.serial = None
@@ -17,7 +16,7 @@ class Serial:
     def frequencies(self):
         return self._frequencies
 
-    def set_frequencies(self, start=1e6, stop=900e6, points=None):
+    def set_frequencies(self, start=5e3, stop=1200e6, points=None):
         if points:
             self.points = points
         self._frequencies = np.linspace(start, stop, self.points)
@@ -71,12 +70,12 @@ class Serial:
         while True:
             c = self.serial.read().decode('utf-8')
             if c == chr(13):
-                continue  # ignore CR
+                next  # ignore CR
             line += c
             if c == chr(10):
                 result += line
                 line = ''
-                continue
+                next
             if line.endswith('ch>'):
                 # stop on prompt
                 break
@@ -111,6 +110,84 @@ class Serial:
             if line:
                 x.extend([float(d) for d in line.strip().split(' ')])
         return np.array(x[0::2]) + np.array(x[1::2]) * 1j
+
+    def fetch_gamma(self, freq=None):
+        if freq:
+            self.set_frequency(freq)
+        self.send_command("gamma\r")
+        data = self.serial.readline()
+        d = data.strip().split(' ')
+        return (int(d[0]) + int(d[1]) * 1.j) / REF_LEVEL
+
+    def resume(self):
+        self.send_command("resume\r")
+
+    def pause(self):
+        self.send_command("pause\r")
+
+    def scan_gamma0(self, port=None):
+        self.set_port(port)
+        return np.vectorize(self.gamma)(self.frequencies)
+
+    def scan_gamma(self, port=None):
+        self.set_port(port)
+        return np.vectorize(self.fetch_gamma)(self.frequencies)
+
+    def data(self, array=0):
+        self.send_command("data %d\r" % array)
+        data = self.fetch_data()
+        x = []
+        for line in data.split('\n'):
+            if line:
+                d = line.strip().split(' ')
+                x.append(float(d[0]) + float(d[1]) * 1.j)
+        return np.array(x)
+
+    def fetch_frequencies(self):
+        self.send_command("frequencies\r")
+        data = self.fetch_data()
+        x = []
+        for line in data.split('\n'):
+            if line:
+                x.append(float(line))
+        self._frequencies = np.array(x)
+
+    def send_scan(self, start=1e6, stop=900e6, points=None):
+        if points:
+            self.send_command("scan %d %d %d\r" % (start, stop, points))
+        else:
+            self.send_command("scan %d %d\r" % (start, stop))
+
+    def scan(self):
+        segment_length = self.points
+        array0 = []
+        array1 = []
+        if self._frequencies is None:
+            self.fetch_frequencies()
+        freqs = self._frequencies
+        while len(freqs) > 0:
+            seg_start = freqs[0]
+            seg_stop = freqs[segment_length - 1] if len(freqs) >= segment_length else freqs[-1]
+            length = segment_length if len(freqs) >= segment_length else len(freqs)
+            # print((seg_start, seg_stop, length))
+            self.send_scan(seg_start, seg_stop, length)
+            array0.extend(self.data(0))
+            array1.extend(self.data(1))
+            freqs = freqs[segment_length:]
+        self.resume()
+        return (array0, array1, self.frequencies)
+
+    def skrf_network(self, x):
+        import skrf as sk
+        n = sk.Network()
+        n.frequency = sk.Frequency.from_f(self.frequencies / 1e6, unit='mhz')
+        n.s = x
+        return n
+
+    def smith(self, x):
+        n = self.skrf_network(x)
+        n.plot_s_smith()
+        return n
 
 
 def getport() -> str:

@@ -20,3 +20,6 @@ class Cable:
 
     def set_tbreak(self, tb):
         self.t_break = tb
+
+    def set_vbreak(self, vb):
+        self.v_break = vb

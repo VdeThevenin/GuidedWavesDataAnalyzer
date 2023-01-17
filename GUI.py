@@ -71,11 +71,8 @@ class GUI:
                                       key='RPOutput')]]
 
         layout = [
-            [sg.Text('Root Folder:', size=(15, 0)),
-             sg.In(size=(80, 1), enable_events=True, key='FolderSelected'),
-             sg.FolderBrowse(button_text='Browse', key='folder_browser')],
-            [sg.Listbox([], size=(30, 30), select_mode='extended', key='ListBox'),
-             sg.Canvas(key='canvas', size=(300, 400)),
+            [sg.Button('Connect', key='connect_serial')],
+            [sg.Canvas(key='canvas', size=(300, 400)),
              sg.Frame(layout=param_column, title="frame", key='param_col')
              ],
             [sg.Button('Plot', key='plot_bt'), sg.Quit('Sair')],
@@ -92,35 +89,6 @@ class GUI:
         data_to_plot = []
         zp = ZoomPan()
 
-        nanovna = NVSerial()
-        nanovna.open()
-        nanovna.set_frequencies(1e6, 1200e6,101)
-
-        # gLen = float(self._VARS['values']['gLenInput'])
-        # Zo = float(self._VARS['values']['zoInput'])
-        C = (0, " \u03BCF")
-        L = (0, "mH")
-        Er = 0
-        WS = 0
-        Zo = 75
-        gLen = 2.92
-        frame = set_frame(nanovna, Zo, gLen)
-
-        C, L, WS, Er = calculate_params(Zo, frame.cable.t_break, gLen)
-
-        C = set_unit_prefix(C, "F")
-        L = set_unit_prefix(L, "H")
-
-        self.update_param_frame((C, L, Er, WS))
-
-        self.clear_chart()
-
-        frame.update(C, L, WS, Er)
-
-        frame.plot(self._VARS['pltFig'])
-
-        self.frames.append(frame)
-
         self.update_chart()
 
         while True:
@@ -128,20 +96,37 @@ class GUI:
 
             if event in (None, 'Sair'):
                 break
-            elif event == 'FolderSelected':
-                names_arr = []
-                p = self._VARS['values']['FolderSelected']
+            elif event == 'connect_serial':
+                nanovna = NVSerial()
+                nanovna.open()
+                nanovna.set_frequencies(1e6, 1200e6, 101)
 
-                types = ('.null', '/*.s1p')  # the tuple of file types
-                files = []
-                for tp in types:
-                    files.extend(glob.glob(glob.escape(p) + tp))
+                # gLen = float(self._VARS['values']['gLenInput'])
+                # Zo = float(self._VARS['values']['zoInput'])
+                C = (0, " \u03BCF")
+                L = (0, "mH")
+                Er = 0
+                WS = 0
+                Zo = 75
+                gLen = 2.92
+                frame = set_frame(nanovna, Zo, gLen)
 
-                for file in files:
-                    names_arr.append(file[file.rfind('\\')+1:])
+                C, L, WS, Er = calculate_params(Zo, frame.cable.t_break, gLen)
 
-                self._VARS['window']['ListBox'].Update(values=names_arr)
+                C = set_unit_prefix(C, "F")
+                L = set_unit_prefix(L, "H")
 
+                self.update_param_frame((C, L, Er, WS))
+
+                self.clear_chart()
+
+                frame.update(C, L, WS, Er)
+
+                frame.plot(self._VARS['pltFig'])
+
+                self.frames.append(frame)
+
+                self.update_chart()
             elif event == 'gLenInput' or event == 'zoInput':
 
                 glen = validate_field_value(self._VARS['values']['gLenInput'])

@@ -4,7 +4,7 @@ import numpy as np
 from scipy import signal
 
 
-def ifft(s1p, nfft=2**14, raw=False):
+def ifft(s1p, nfft=2**14):
 
     # if not raw:
     #    cable = rf.Network(s1p)

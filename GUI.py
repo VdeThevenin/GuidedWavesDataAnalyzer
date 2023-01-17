@@ -1,5 +1,8 @@
 import datetime
+import threading
 from os import path
+from threading import Thread
+from threading import Event
 import PySimpleGUI as sg
 from matplotlib import pyplot as pp
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
@@ -9,6 +12,7 @@ from ZoomPan import ZoomPan
 from Frame import *
 from Snapshot import Snapshot
 from NVSerial import *
+
 
 class GUI:
     def __init__(self):
@@ -34,7 +38,8 @@ class GUI:
 
         param_column = [[sg.Text("Guide Length", key='word1', size=(12, 0)),
                          sg.Input("1.0", size=(10, 0), key='gLenInput', enable_events=True),
-                         sg.Text("m", key='len_u', size=(3, 0))],
+                         sg.Text("m", key='len_u', size=(3, 0)),
+                         sg.Button('Set', key='set_btn')],
                         [sg.Text("Zo", key='word2', size=(12, 0)),
                          sg.Input("75", size=(10, 0), key='zoInput', enable_events=True),
                          sg.Text("\u03A9", key='zo_u', size=(6, 0))],
@@ -71,14 +76,16 @@ class GUI:
                                       key='RPOutput')]]
 
         layout = [
-            [sg.Button('Connect', key='connect_serial')],
+            [sg.Button('Connect', key='connect_serial'),
+             sg.Button('Plot Ref', key='ref_btn', visible=False),
+             sg.Button('Test', key='test_btn', visible=False)],
             [sg.Canvas(key='canvas', size=(300, 400)),
              sg.Frame(layout=param_column, title="frame", key='param_col')
              ],
-            [sg.Button('Plot', key='plot_bt'), sg.Quit('Sair')],
+            [sg.Button('Plot', key='plot_bt'), sg.Quit('Exit')],
         ]
 
-        self._VARS['window'] = sg.Window('GUIded Waves TDR Data Analyzer',
+        self._VARS['window'] = sg.Window('GUIded Waves',
                                          layout,
                                          finalize=True,
                                          return_keyboard_events=True)
@@ -90,25 +97,35 @@ class GUI:
         zp = ZoomPan()
 
         self.update_chart()
-
+        tst = False
         while True:
             event, self._VARS['values'] = self._VARS['window'].Read()
 
             if event in (None, 'Sair'):
                 break
             elif event == 'connect_serial':
-                nanovna = NVSerial()
-                nanovna.open()
-                nanovna.set_frequencies(1e6, 1200e6, 101)
-
-                # gLen = float(self._VARS['values']['gLenInput'])
-                # Zo = float(self._VARS['values']['zoInput'])
+                try:
+                    nanovna = NVSerial()
+                    nanovna.open()
+                    nanovna.set_frequencies(1e6, 1200e6, 101)
+                    self._VARS['window']['ref_btn'].Update(visible=True)
+                    self._VARS['window']['test_btn'].Update(visible=True)
+                    self._VARS['window']['connect_serial'].Update("Disconnect")
+                    self.clear_chart()
+                    self.update_chart()
+                except:
+                    nanovna.close()
+                    self._VARS['window']['ref_btn'].Update(visible=False)
+                    self._VARS['window']['test_btn'].Update(visible=False)
+                    self._VARS['window']['connect_serial'].Update("Connect")
+                # print('already connected')
+            elif event == 'ref_btn':
+                gLen = float(self._VARS['values']['gLenInput'])
+                Zo = float(self._VARS['values']['zoInput'])
                 C = (0, " \u03BCF")
                 L = (0, "mH")
                 Er = 0
                 WS = 0
-                Zo = 75
-                gLen = 2.92
                 frame = set_frame(nanovna, Zo, gLen)
 
                 C, L, WS, Er = calculate_params(Zo, frame.cable.t_break, gLen)
@@ -122,12 +139,47 @@ class GUI:
 
                 frame.update(C, L, WS, Er)
 
-                frame.plot(self._VARS['pltFig'])
+                # frame.plot(self._VARS['pltFig'])
 
                 self.frames.append(frame)
 
+                plot_frames(self.frames,self._VARS['pltFig'])
+
                 self.update_chart()
-            elif event == 'gLenInput' or event == 'zoInput':
+                figZoom = zp.zoom_factory(base_scale=1.1)
+                figPan = zp.pan_factory(plt.gca())
+            elif event == 'test_btn':
+                tst = tst ^ True
+                gLen = float(self._VARS['values']['gLenInput'])
+                Zo = float(self._VARS['values']['zoInput'])
+                if tst is True:
+
+                    ev = Event()
+                    self._VARS['window']['test_btn'].Update("Stop Test")
+                    t = Thread(target=test, args=(self.frames, nanovna, Zo, gLen, ev, 3))
+                    t.start()
+                    # t.join()
+                else:
+                    self._VARS['window']['test_btn'].Update("Test")
+                    ev.set()
+                    t.join()
+
+                    f0 = self.frames[0]
+
+                    C, L, WS, Er = calculate_params(float(Zo), f0.cable.t_break, float(gLen))
+
+                    for frame in self.frames:
+                        frame.update(C, L, WS, Er)
+
+                    self.clear_chart()
+                    p = 'D:\\git\\GuidedWavesDataAnalyzer\\out.csv'
+                    save_frame_collection_as_csv(self.frames, p)
+                    plot_frames(self.frames, self._VARS['pltFig'], q=10)
+
+                    self.update_chart()
+                figZoom = zp.zoom_factory(base_scale=1.1)
+                figPan = zp.pan_factory(plt.gca())
+            elif event == 'set_btn':
 
                 glen = validate_field_value(self._VARS['values']['gLenInput'])
                 self._VARS['window']['gLenInput'].Update(value=glen)
@@ -151,11 +203,11 @@ class GUI:
                 self.update_param_frame((C, L, Er, WS))
 
                 self.clear_chart()
+                if len(self.frames) > 0:
+                    for frame in self.frames:
+                        frame.update(C, L, WS, Er)
 
-                for frame in self.frames:
-                    frame.update(C, L, WS, Er)
-
-                plot_frames(self.frames,self._VARS['pltFig'], "teste2")
+                    plot_frames(self.frames, self._VARS['pltFig'])
 
                 self.update_chart()
                 figZoom = zp.zoom_factory(base_scale=1.1)
@@ -173,7 +225,7 @@ class GUI:
 
                 self.frames.append(frame)
 
-                plot_frames(self.frames, self._VARS['pltFig'], "teste1")
+                plot_frames(self.frames, self._VARS['pltFig'])
                 # for f in self.frames:
                 # f.plot(self._VARS['pltFig'])
 
@@ -218,8 +270,8 @@ class GUI:
         for d in self.data:
             if d[2] == 'original data':
                 pp.plot(d[0], d[1], label=d[2])
-                self._PLOT_PARAM['y_max'] = 1.1*np.max(d[1])
-                self._PLOT_PARAM['y_min'] = np.min(d[1]) - 0.01*np.max(d[1])
+                self._PLOT_PARAM['y_max'] = 1.1 * np.max(d[1])
+                self._PLOT_PARAM['y_min'] = np.min(d[1]) - 0.01 * np.max(d[1])
             else:
                 pp.plot(d[0], d[1], label=d[2])
 
@@ -233,7 +285,7 @@ class GUI:
 
     def get_data(self):
         p = self._VARS['values']['FolderSelected']
-        files = glob.glob(glob.escape(p)+ "/*.csv")
+        files = glob.glob(glob.escape(p) + "/*.csv")
 
         print(files)
         for file in files:
@@ -271,9 +323,17 @@ class GUI:
         self._VARS['window']['WSOutput'].Update(value=int(WS))
 
 
-def validate_field_value(newval : str):
-    alphalist = [chr(i) for i in range(ord('A'), ord('Z')+1)]
-    alphalist += [chr(i) for i in range(ord('a'), ord('z')+1)]
+
+def validate_field_value(newval: str):
+    try:
+        nv = float(newval)
+    except:
+        nv = 1.0
+    return nv
+
+def validate_field_value_old(newval: str):
+    alphalist = [chr(i) for i in range(ord('A'), ord('Z') + 1)]
+    alphalist += [chr(i) for i in range(ord('a'), ord('z') + 1)]
 
     if newval == '' or newval == '-':
         return 0
@@ -297,9 +357,9 @@ def validate_field_value(newval : str):
         return newval
 
 
-def set_frame(nanovna:NVSerial, zo, l):
+def set_frame(nanovna: NVSerial, zo, l, spf=10, delay=0.1):
     from datetime import datetime
-    SNAPSHOTS_PER_FRAME = 10
+    SNAPSHOTS_PER_FRAME = spf
     ss_list = []
     for i in range(0, SNAPSHOTS_PER_FRAME):
         data = nanovna.scan()
@@ -307,13 +367,14 @@ def set_frame(nanovna:NVSerial, zo, l):
         name = datetime.timestamp(now)
         ss = Snapshot(data, name)
         ss_list.append(ss)
-        time.sleep(0.1)
+        time.sleep(delay)
 
     f = Frame(zo, l)
     f.add_snapshots_list(ss_list)
     f.run()
 
     return f
+
 
 def calculate_params(zo, t_break, length):
     if not t_break > 0:
@@ -331,6 +392,33 @@ def calculate_params(zo, t_break, length):
     rp = 1 / (speed ** 2 * e0 * u0)
 
     return c, l, speed, rp
+
+
+def test(frames, nanovna, Zo, gLen, event, delay):
+    i = 0
+    while True:
+        if event.is_set():
+            break
+        frame = set_frame(nanovna, Zo, gLen, spf=1, delay=delay)
+        frames.append(frame)
+        i += 1
+        print("frames taken: " + str(i))
+
+
+def save_frame_collection_as_csv(frames, p):
+    df = DataFrame()
+
+    for frame in frames:
+        df[frame.name] = frame.average[0]
+
+    from pathlib import Path
+
+    filepath = Path(p)
+
+    # filepath.parent.mkdir(parents=True, exist_ok=True)
+
+    df.to_csv(filepath, index=False)
+
 
 tela = GUI()
 tela.start()

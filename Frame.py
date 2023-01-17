@@ -3,6 +3,7 @@ from pandas import DataFrame
 from Cable import Cable
 import matplotlib.pyplot as plt
 import numpy as np
+from scipy import signal
 
 
 class Frame:
@@ -12,8 +13,11 @@ class Frame:
         self.tdr = DataFrame()
         self.z_response = DataFrame()
         self.imax = 0
+        self.ibreak = 0
         self.average = [[], []]
         self.dtdr_dt = []
+        self.idxs = []
+        self.conv_avg = []
         self.cable = Cable(zo, length)
         self.name = ""
 
@@ -26,7 +30,7 @@ class Frame:
             self.name = name
 
         self.tdr[name] = ss.get_s11()
-        self.z_response[name] = ss.get_z_response()
+        self.z_response[name] = np.abs(50*ss.get_z_response())
         self.mean()
 
     def add_snapshots_list(self, sslist):
@@ -45,19 +49,19 @@ class Frame:
         imax = 0
         for i in range(0, len(tdr)-1):
             deriv.append((tdr[i + 1] - tdr[i]) / (t[i + 1] - t[i]))
-            max_deriv = max(deriv)
-            if deriv[-1] == max_deriv:
-                imax = i
 
         deriv.append(0)
 
         self.dtdr_dt = [d/max(deriv) for d in deriv]
 
-        imax = np.where(tdr>0.75)
-        imax = imax[0][0]
+        self.idxs, areas = get_peak_areas(tdr, self.dtdr_dt)
+
+        imax = self.idxs[np.where(areas == max(areas))]
+        imax = imax[0]
         self.imax = imax
-        self.cable.set_tbreak(t[imax])
-        self.cable.set_vbreak(tdr[imax])
+        self.ibreak = imax-20
+        self.cable.set_tbreak(t[self.ibreak])
+        self.cable.set_vbreak(tdr[self.ibreak])
 
     def set_x(self):
         t = self.timeline
@@ -69,20 +73,29 @@ class Frame:
         self.mean()
         self.derivate()
         self.set_x()
+        self.conv_avg = convolve_with_rect(self.timeline, self.average[0], 10)
 
     def plot(self, figure):
+        raise ValueError("Deprecated Function")
         # self.set_plot_lim()
 
         # self.dtdr_dt.append(0)
         ilim = self.imax
 
-        t0, y0 = frame_analysis(self, self, ilim)
+        t0, y0 = frame_compare(self, self, ilim)
+
+        ip, yp = get_peak_areas(self.average[0], self.dtdr_dt)
+
         figure.suptitle(self.name, x=0.2, y=0.98)
         plt.tight_layout()
         ax = figure.add_subplot(1, 1, 1)
-        ax.plot(self.x[:ilim], self.average[0][:ilim], label=self.name)
-        ax.plot(self.x[:ilim], self.dtdr_dt[:ilim])
+        # ax.plot(self.x[:ilim], self.average[0][:ilim], label=self.name)
+        # ax.plot(self.x[:ilim], self.dtdr_dt[:ilim])
+        ax.plot(self.x, self.average[0], label=self.name)
+        ax.plot(self.x, self.dtdr_dt)
+        ax.plot(self.x, self.conv_avg)
         ax.scatter(t0, y0)
+        ax.scatter(self.x[ip], yp)
         ax.grid()
         ax.grid(visible=True, which='minor', color='lightgray', linestyle='-')
 
@@ -90,8 +103,8 @@ class Frame:
 
         ax.legend(handles[::-1], labels[::-1])
 
-        ax.set_xlabel('time [s]')
-        ax.set_ylabel(r'$S_{11}$' + " Parameter")
+        ax.set_xlabel('length [m]')
+        ax.set_ylabel(r'$S_{11}$ [V]')
 
     def update(self, c, l, s, rp):
         self.cable.speed = s
@@ -100,29 +113,33 @@ class Frame:
         self.cable.relative_permissivity = rp
         self.run()
 
-    def set_plot_lim(self):
-        self.average[0] = self.average[0][:self.imax]
-        self.average[1] = self.average[1][:self.imax]
-        self.timeline = self.timeline[:self.imax]
-        self.x = self.x[:self.imax]
-        self.dtdr_dt = self.dtdr_dt[:self.imax]
 
-
-def plot_frames(frames, figure, name):
-
+def plot_frames(frames, figure, q=None):
+    assert(len(frames) > 0)
+    name = "Reflection by Guide Length"
     figure.suptitle(name, x=0.2, y=0.98)
     plt.tight_layout()
     ax = figure.add_subplot(1, 1, 1)
 
     ilim = frames[0].imax
+    conv = correlate(frames[0].average[0], frames[-1].average[0])
+    if q is None:
+        ax.plot(frames[0].x[:ilim], frames[0].average[0][:ilim], label="ref: " + str(frames[0].name))
+        # ax.plot(frames[0].x[:ilim], frames[0].average[1][:ilim], label="z")
+        if len(frames) > 2:
+            ax.plot(frames[-2].x[:ilim], frames[-2].average[0][:ilim], label="last: " + str(frames[-2].name))
+        if len(frames) > 1:
+            ax.plot(frames[-1].x[:ilim], frames[-1].average[0][:ilim], label="new: " + str(frames[-1].name))
 
-    for frame in frames:
-        # frame.set_plot_lim()
-        ax.plot(frame.x[:ilim], frame.average[0][:ilim], label=frame.name)
+        x0, y0 = frame_compare(frames[0], frames[-1], ilim)
+        ax.scatter(x0[:ilim], y0[:ilim], label="detected", c='red')
 
-    t0, y0 = frame_analysis(frames[0], frames[-1], ilim)
-    ax.scatter(t0[:ilim], y0[:ilim], label="detected")
-
+        plt.axvline(frames[0].x[frames[0].ibreak], color='red', label='break')
+    else:
+        ax.plot(frames[0].x, frames[0].average[0], label="ref: " + str(frames[0].name))
+        for i in range(1, min([q, len(frames)])-1):
+            ax.plot(frames[i].x, frames[i].average[0], label="frame #" + str(i+1) + ": " + str(frames[i].name))
+        ax.plot(frames[-1].x, frames[-1].average[0], label="new: " + str(frames[-1].name))
     ax.grid()
     ax.grid(visible=True, which='minor', color='lightgray', linestyle='-')
 
@@ -162,7 +179,7 @@ def set_unit_prefix(value, main_unit):
         return a, (d_arr[d]+main_unit)
 
 
-def frame_analysis(f0:Frame,f1:Frame, ilim):
+def frame_compare(f0:Frame, f1:Frame, ilim):
     dmin = 0.25
     diffmin = 0.02
     x = f1.x[:ilim]
@@ -198,3 +215,58 @@ def derivate(x, y):
     deriv = [d/max(deriv) for d in deriv]
 
     return deriv
+
+
+def convolve_with_rect(t, y, rect_len):
+    st = rect_len
+    T = t[1] - t[0]  # sampling width
+    rect = np.where(np.logical_and(t >= st*T, t <= (st+rect_len)*T), 1, 0)  # build input functions
+
+    return convolve(rect, y)
+
+
+def convolve(y1, y2):
+    n = len(y1)
+    y1 = np.convolve(y1, y2, mode='full')  # scaled convolution
+
+    return np.array([k / max(y1[:n]) for k in y1[:n]])
+
+
+def correlate(y1, y2):
+    n = len(y1)
+    y1 = signal.correlate(y1, y2, mode='same')/(np.linalg.norm(y1) * np.linalg.norm(y2)) # np.correlate(y1, y2, mode='full')  # scaled convolution
+
+    return np.array([k for k in y1[:n]])
+
+
+def get_peaks_idxs(d):
+    d = np.abs(d)
+    dmin = 0.3
+    idxs = []
+    for i in range(1, len(d) - 1):
+        if d[i - 1] < d[i] > d[i + 1] and d[i] > dmin:
+            idxs.append(i)
+    return idxs
+
+
+def peak_area(idxs: tuple, tdr):
+    a = 0
+    for i in range(idxs[0], idxs[1]):
+        a += tdr[i]
+
+    return a
+
+
+def get_peak_areas(tdr, dydt):
+    idxs = get_peaks_idxs(dydt)
+
+    idxs.append(len(tdr))
+    areas = []
+    for i in range(0, len(idxs)-1):
+        areas.append(peak_area([idxs[i], idxs[i+1]], tdr))
+
+    areas = np.array([a/max(areas) for a in areas])
+
+    idxs = np.array(idxs[:-1])
+
+    return idxs, areas

@@ -38,7 +38,7 @@ def ifft(s1p, nfft=2**14):
     for i in range(1, len(td_r)):
         td_r[i] += td_r[i-1]
 
-    td_r = [np.abs(2*np.real(x)) for x in td_r]
+    td_r = [np.abs(1*np.real(x)) for x in td_r]
 
     return t_axis, td_r, step_response_z
 

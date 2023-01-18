@@ -47,7 +47,7 @@ class Frame:
         tdr = self.average[0]
 
         imax = 0
-        for i in range(0, len(tdr)-1):
+        for i in range(0, min([len(tdr), len(t)])-1):
             deriv.append((tdr[i + 1] - tdr[i]) / (t[i + 1] - t[i]))
 
         deriv.append(0)
@@ -74,37 +74,6 @@ class Frame:
         self.derivate()
         self.set_x()
         self.conv_avg = convolve_with_rect(self.timeline, self.average[0], 10)
-
-    def plot(self, figure):
-        raise ValueError("Deprecated Function")
-        # self.set_plot_lim()
-
-        # self.dtdr_dt.append(0)
-        ilim = self.imax
-
-        t0, y0 = frame_compare(self, self, ilim)
-
-        ip, yp = get_peak_areas(self.average[0], self.dtdr_dt)
-
-        figure.suptitle(self.name, x=0.2, y=0.98)
-        plt.tight_layout()
-        ax = figure.add_subplot(1, 1, 1)
-        # ax.plot(self.x[:ilim], self.average[0][:ilim], label=self.name)
-        # ax.plot(self.x[:ilim], self.dtdr_dt[:ilim])
-        ax.plot(self.x, self.average[0], label=self.name)
-        ax.plot(self.x, self.dtdr_dt)
-        ax.plot(self.x, self.conv_avg)
-        ax.scatter(t0, y0)
-        ax.scatter(self.x[ip], yp)
-        ax.grid()
-        ax.grid(visible=True, which='minor', color='lightgray', linestyle='-')
-
-        handles, labels = ax.get_legend_handles_labels()
-
-        ax.legend(handles[::-1], labels[::-1])
-
-        ax.set_xlabel('length [m]')
-        ax.set_ylabel(r'$S_{11}$ [V]')
 
     def update(self, c, l, s, rp):
         self.cable.speed = s
@@ -136,10 +105,14 @@ def plot_frames(frames, figure, q=None):
 
         plt.axvline(frames[0].x[frames[0].ibreak], color='red', label='break')
     else:
-        ax.plot(frames[0].x, frames[0].average[0], label="ref: " + str(frames[0].name))
-        for i in range(1, min([q, len(frames)])-1):
-            ax.plot(frames[i].x, frames[i].average[0], label="frame #" + str(i+1) + ": " + str(frames[i].name))
-        ax.plot(frames[-1].x, frames[-1].average[0], label="new: " + str(frames[-1].name))
+        if q == 1:
+            ax.plot(frames[0].x[:ilim], frames[0].average[0][:ilim], label="sample")
+            plt.axvline(frames[0].x[frames[0].ibreak], color='red', label='break')
+        else:
+            ax.plot(frames[0].x, frames[0].average[0], label="ref: " + str(frames[0].name))
+            for i in range(1, min([q, len(frames)])-1):
+                ax.plot(frames[i].x, frames[i].average[0], label="frame #" + str(i+1) + ": " + str(frames[i].name))
+            ax.plot(frames[-1].x, frames[-1].average[0], label="new: " + str(frames[-1].name))
     ax.grid()
     ax.grid(visible=True, which='minor', color='lightgray', linestyle='-')
 
@@ -147,8 +120,8 @@ def plot_frames(frames, figure, q=None):
 
     ax.legend(handles[::-1], labels[::-1])
 
-    ax.set_xlabel('time [s]')
-    ax.set_ylabel(r'$S_{11}$' + " Parameter")
+    ax.set_xlabel('cable length [m]')
+    ax.set_ylabel(r'$S_{11}$ [V]')
 
 def set_unit_prefix(value, main_unit):
 

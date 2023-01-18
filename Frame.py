@@ -8,6 +8,7 @@ from scipy import signal
 
 class Frame:
     def __init__(self, zo, length):
+        self.areas = []
         self.timeline = []
         self.x = []
         self.tdr = DataFrame()
@@ -54,12 +55,12 @@ class Frame:
 
         self.dtdr_dt = [d/max(deriv) for d in deriv]
 
-        self.idxs, areas = get_peak_areas(tdr, self.dtdr_dt)
+        self.idxs, self.areas = get_peak_areas(tdr, self.dtdr_dt)
 
-        imax = self.idxs[np.where(areas == max(areas))]
+        imax = self.idxs[np.where(self.areas == max(self.areas))]
         imax = imax[0]
         self.imax = imax
-        self.ibreak = imax-20
+        self.ibreak = imax # -20
         self.cable.set_tbreak(t[self.ibreak])
         self.cable.set_vbreak(tdr[self.ibreak])
 
@@ -71,9 +72,10 @@ class Frame:
 
     def run(self):
         self.mean()
+        self.average[0] = convolve_with_rect(self.timeline, self.average[0], 10)
         self.derivate()
         self.set_x()
-        self.conv_avg = convolve_with_rect(self.timeline, self.average[0], 10)
+
 
     def update(self, c, l, s, rp):
         self.cable.speed = s
@@ -83,7 +85,7 @@ class Frame:
         self.run()
 
 
-def plot_frames(frames, figure, q=None):
+def plot_frames(frames, figure, q=None, debug=False):
     assert(len(frames) > 0)
     name = "Reflection by Guide Length"
     figure.suptitle(name, x=0.2, y=0.98)
@@ -92,27 +94,40 @@ def plot_frames(frames, figure, q=None):
 
     ilim = frames[0].imax
     conv = correlate(frames[0].average[0], frames[-1].average[0])
-    if q is None:
-        ax.plot(frames[0].x[:ilim], frames[0].average[0][:ilim], label="ref: " + str(frames[0].name))
-        # ax.plot(frames[0].x[:ilim], frames[0].average[1][:ilim], label="z")
-        if len(frames) > 2:
-            ax.plot(frames[-2].x[:ilim], frames[-2].average[0][:ilim], label="last: " + str(frames[-2].name))
-        if len(frames) > 1:
-            ax.plot(frames[-1].x[:ilim], frames[-1].average[0][:ilim], label="new: " + str(frames[-1].name))
-
-        x0, y0 = frame_compare(frames[0], frames[-1], ilim)
-        ax.scatter(x0[:ilim], y0[:ilim], label="detected", c='red')
-
-        plt.axvline(frames[0].x[frames[0].ibreak], color='red', label='break')
+    if debug:
+        ax.plot(frames[0].x, frames[0].average[0], label="avg0: " + str(frames[0].name))
+        ax.plot(frames[0].x, frames[0].dtdr_dt, label="dy/dt")
+        ax.scatter(frames[0].x[frames[0].idxs], frames[0].areas, label="areas")
     else:
-        if q == 1:
-            ax.plot(frames[0].x[:ilim], frames[0].average[0][:ilim], label="sample")
+        if q is None:
+            ax.plot(frames[0].x[:ilim], frames[0].average[0][:ilim], label="ref: " + str(frames[0].name))
+
+            if len(frames) > 2:
+                ax.plot(frames[-2].x[:ilim], frames[-2].average[0][:ilim], label="last: " + str(frames[-2].name))
+            if len(frames) > 1:
+                ax.plot(frames[-1].x[:ilim], frames[-1].average[0][:ilim], label="new: " + str(frames[-1].name))
+
+            x0, y0 = frame_compare(frames[0], frames[-1], ilim)
+            if len(x0) > 0:
+                ax.scatter(x0[:ilim], y0[:ilim], label="detected", c='red')
+                for i in range(0, len(x0)):
+                    ax.annotate(f'{y0[i]:.2f}\n@{x0[i]:.2f}',
+                                xy=(x0[i], y0[i]),  # theta, radius
+                                xytext=(x0[i], y0[i]+0.2),  # fraction, fraction
+                                arrowprops=dict(facecolor='black', shrink=0.005),
+                                horizontalalignment='center',
+                                verticalalignment='top')
+
             plt.axvline(frames[0].x[frames[0].ibreak], color='red', label='break')
         else:
-            ax.plot(frames[0].x, frames[0].average[0], label="ref: " + str(frames[0].name))
-            for i in range(1, min([q, len(frames)])-1):
-                ax.plot(frames[i].x, frames[i].average[0], label="frame #" + str(i+1) + ": " + str(frames[i].name))
-            ax.plot(frames[-1].x, frames[-1].average[0], label="new: " + str(frames[-1].name))
+            if q == 1:
+                ax.plot(frames[0].x[:ilim], frames[0].average[0][:ilim], label="sample")
+                plt.axvline(frames[0].x[frames[0].ibreak], color='red', label='break')
+            else:
+                ax.plot(frames[0].x, frames[0].average[0], label="ref: " + str(frames[0].name))
+                for i in range(1, min([q, len(frames)])-1):
+                    ax.plot(frames[i].x, frames[i].average[0], label="frame #" + str(i+1) + ": " + str(frames[i].name))
+                ax.plot(frames[-1].x, frames[-1].average[0], label="new: " + str(frames[-1].name))
     ax.grid()
     ax.grid(visible=True, which='minor', color='lightgray', linestyle='-')
 
@@ -199,10 +214,11 @@ def convolve_with_rect(t, y, rect_len):
 
 
 def convolve(y1, y2):
+    n0 = 10
     n = len(y1)
     y1 = np.convolve(y1, y2, mode='full')  # scaled convolution
 
-    return np.array([k / max(y1[:n]) for k in y1[:n]])
+    return np.array([k / max(y1[n0:n]) for k in y1[n0:n+n0]])
 
 
 def correlate(y1, y2):
@@ -214,7 +230,7 @@ def correlate(y1, y2):
 
 def get_peaks_idxs(d):
     d = np.abs(d)
-    dmin = 0.3
+    dmin = 0.5
     idxs = []
     for i in range(1, len(d) - 1):
         if d[i - 1] < d[i] > d[i + 1] and d[i] > dmin:

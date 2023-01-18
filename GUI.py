@@ -102,8 +102,8 @@ class GUI:
         while True:
             event, self._VARS['values'] = self._VARS['window'].Read(timeout=200)
 
-            glen = float(self._VARS['values']['glenInput'])
-            zo = float(self._VARS['values']['zoInput'])
+            glen = validate_field_value(self._VARS['values']['glenInput'])
+            zo = validate_field_value(self._VARS['values']['zoInput'])
 
             if event in (None, 'Exit'):
                 break
@@ -158,7 +158,7 @@ class GUI:
                 clear_chart()
                 frame.update(c, ind, ws, er)
                 self.frames = [frame]
-                plot_frames(self.frames, self._VARS['pltFig'])
+                plot_frames(self.frames, self._VARS['pltFig'], debug=True)
                 self.update_chart()
 
                 zp.zoom_factory(base_scale=1.1)

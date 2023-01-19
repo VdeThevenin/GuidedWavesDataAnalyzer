@@ -158,7 +158,7 @@ class GUI:
                 clear_chart()
                 frame.update(c, ind, ws, er)
                 self.frames = [frame]
-                plot_frames(self.frames, self._VARS['pltFig'], debug=True)
+                plot_frames(self.frames, self._VARS['pltFig'])
                 self.update_chart()
 
                 zp.zoom_factory(base_scale=1.1)
@@ -195,6 +195,9 @@ class GUI:
             elif event == 'rt_btn':
 
                 frame = set_frame(nanovna, zo, glen, spf=1, delay=0)
+                c, ind, ws, er = calculate_params(zo, frame.cable.t_break, glen)
+                frame.update(c, ind, ws, er)
+                self.frames.append(frame)
                 self.frames.append(frame)
                 rt = rt ^ True
 
@@ -248,8 +251,8 @@ class GUI:
                 frame = set_frame(nanovna, zo, glen, spf=1, delay=0)
                 c, ind, ws, er = calculate_params(zo, frame.cable.t_break, glen)
                 frame.update(c, ind, ws, er)
-                self.frames = [frame]
-                plot_frames(self.frames, self._VARS['pltFig'], q=1)
+                self.frames[-1] = frame
+                plot_frames(self.frames, self._VARS['pltFig'])
                 self.update_chart()
 
         self._VARS['window'].close()

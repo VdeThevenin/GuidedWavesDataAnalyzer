@@ -66,12 +66,18 @@ class Frame:
         self.debug.append([self.timeline, self.average[0], 'tdr'])
         self.derivate()
         self.set_ibreak()
+
+    def set_ibreak(self, ib=None):
+        if ib is None:
+            self.get_ibreak()
+        else:
+            self.ibreak = ib + 10
+            self.imax = self.ibreak + 10
         self.cable.set_tbreak(self.timeline[self.ibreak])
         self.cable.set_vbreak(self.average[0][self.ibreak])
-
         self.set_x()
 
-    def set_ibreak(self):
+    def get_ibreak(self):
         rect_len = int(len(self.average[0]) / 6)
         rmp = convolve_with_rect(self.timeline, self.average[0], rect_len)
         drdt = derivate(self.timeline, self.average[0])
@@ -93,7 +99,10 @@ class Frame:
         self.ibreak = ib[0][0] + 10
         self.imax = self.ibreak + 10
 
-    def update(self, c, l, s, rp):
+    def update(self, c, l, s, rp, ib=None):
+
+        if ib is not None:
+            self.set_ibreak(ib)
         self.cable.speed = s
         self.cable.capacitance = c
         self.cable.inductance = l
@@ -120,15 +129,16 @@ def plot_frames(frames, figure, q=None, debug=False):
         ax.scatter(frames[-1].timeline[ib], frames[-1].average[0][ib], color='black')
 
     else:
+        x = frames[0].x
         if q is None:
-            ax.plot(frames[0].x[:ilim], frames[0].average[0][:ilim], label="ref: " + str(frames[0].name))
+            ax.plot(x[:ilim], frames[0].average[0][:ilim], label="ref: " + str(frames[0].name))
 
             if len(frames) > 2:
-                ax.plot(frames[-2].x[:ilim], frames[-2].average[0][:ilim], label="last: " + str(frames[-2].name))
+                ax.plot(x[:ilim], frames[-2].average[0][:ilim], label="last: " + str(frames[-2].name))
             if len(frames) > 1:
-                ax.plot(frames[-1].x[:ilim], frames[-1].average[0][:ilim], label="new: " + str(frames[-1].name))
+                ax.plot(x[:ilim], frames[-1].average[0][:ilim], label="new: " + str(frames[-1].name))
 
-            x0, y0 = frame_compare(frames[0], frames[-1], ilim)
+            t0, x0, y0 = frame_compare(frames[0], frames[-1], frames[0].ibreak)
             if len(x0) > 0:
                 ax.scatter(x0[:ilim], y0[:ilim], label="detected", c='red')
                 for i in range(0, len(x0)):
@@ -139,13 +149,13 @@ def plot_frames(frames, figure, q=None, debug=False):
                                 horizontalalignment='center',
                                 verticalalignment='top')
 
-            plt.axvline(frames[0].x[frames[0].ibreak], color='red', label='break')
+            plt.axvline(x[frames[0].ibreak], color='red', label='break')
         else:
             if q == 1:
-                ax.plot(frames[0].x[:ilim], frames[0].average[0][:ilim], label="sample")
+                ax.plot(x[:ilim], frames[0].average[0][:ilim], label="sample")
                 plt.axvline(frames[0].x[frames[0].ibreak], color='red', label='break')
             else:
-                ax.plot(frames[0].x, frames[0].average[0], label="ref: " + str(frames[0].name))
+                ax.plot(x, frames[0].average[0], label="ref: " + str(frames[0].name))
                 for i in range(1, min([q, len(frames)]) - 1):
                     ax.plot(frames[i].x, frames[i].average[0],
                             label="frame #" + str(i + 1) + ": " + str(frames[i].name))
@@ -191,8 +201,9 @@ def set_unit_prefix(value, main_unit):
 
 def frame_compare(f0: Frame, f1: Frame, ilim):
     dmin = 0.25
-    diffmin = 0.02
-    x = f1.x[:ilim]
+    diffmin = 0.005
+    x = f0.x[:ilim]
+    t = f0.timeline[:ilim]
     y0 = f0.average[0][:ilim]
     y1 = f1.average[0][:ilim]
     dy1 = f1.dtdr_dt[:ilim]
@@ -204,7 +215,7 @@ def frame_compare(f0: Frame, f1: Frame, ilim):
         if d2y1[i - 1] < d2y1[i] > d2y1[i + 1] and d2y1[i] > dmin and (y1[i] - y0[i]) > diffmin:
             indexes.append(i)
 
-    return np.array(x[indexes]), np.array(y1[indexes])
+    return np.array(t[indexes]), np.array(x[indexes]), np.array(y1[indexes])
 
 
 def derivate(x, y):

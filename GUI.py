@@ -140,7 +140,10 @@ class GUI:
                 self.update_param_frame((c, ind, er, ws))
 
                 clear_chart()
-                frame.update(c, ind, ws, er)
+                if len(self.frames) == 0:
+                    frame.update(c, ind, ws, er)
+                else:
+                    frame.update(c, ind, ws, er, self.frames[0].ibreak)
                 self.frames.append(frame)
                 plot_frames(self.frames, self._VARS['pltFig'])
                 self.update_chart()
@@ -156,7 +159,10 @@ class GUI:
                 self.update_param_frame((c, ind, er, ws))
 
                 clear_chart()
-                frame.update(c, ind, ws, er)
+                if len(self.frames) == 0:
+                    frame.update(c, ind, ws, er)
+                else:
+                    frame.update(c, ind, ws, er, self.frames[0].ibreak)
                 self.frames = [frame]
                 plot_frames(self.frames, self._VARS['pltFig'])
                 self.update_chart()
@@ -181,7 +187,7 @@ class GUI:
                     c, ind, ws, er = calculate_params(float(zo), f0.cable.t_break, float(glen))
 
                     for frame in self.frames:
-                        frame.update(c, ind, ws, er)
+                        frame.update(c, ind, ws, er, self.frames[0].ibreak)
 
                     clear_chart()
                     p = './out.csv'
@@ -232,7 +238,7 @@ class GUI:
                 clear_chart()
                 if len(self.frames) > 0:
                     for frame in self.frames:
-                        frame.update(c, ind, ws, er)
+                        frame.update(c, ind, ws, er, self.frames[0].ibreak)
 
                     plot_frames(self.frames, self._VARS['pltFig'])
 
@@ -250,7 +256,7 @@ class GUI:
                 clear_chart()
                 frame = set_frame(nanovna, zo, glen, spf=1, delay=0)
                 c, ind, ws, er = calculate_params(zo, frame.cable.t_break, glen)
-                frame.update(c, ind, ws, er)
+                frame.update(c, ind, ws, er, self.frames[0].ibreak)
                 self.frames[-1] = frame
                 plot_frames(self.frames, self._VARS['pltFig'])
                 self.update_chart()

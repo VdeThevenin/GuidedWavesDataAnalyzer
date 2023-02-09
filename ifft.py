@@ -34,13 +34,13 @@ def ifft(s1p, nfft=2**14):
 
     t_axis = np.linspace(0, 1 / (freqs[1]-freqs[0]), nfft)
 
-    td_r = [x for x in td_a]
+    td_r = [x for x in td]
     for i in range(1, len(td_r)):
         td_r[i] += td_r[i-1]
 
     td_r = [np.abs(2*np.real(x)) for x in td_r]
 
-    return t_axis, td_r, step_response_z
+    return t_axis, td_r, step_response_z, td, td_a
 
 
 def get_moving_average(y=None, wsz=70):

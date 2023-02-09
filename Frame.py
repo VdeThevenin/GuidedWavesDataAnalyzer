@@ -8,15 +8,19 @@ from scipy import signal
 
 class Frame:
     def __init__(self, zo, length):
+        self.td_wo_os = []
+        self.td_w_os = []
+        self.raw_freq = []
         self.d2rdt2 = []
         self.debug = []
         self.timeline = []
         self.x = []
         self.tdr = DataFrame()
+        self.raw_s11 = DataFrame()
         self.z_response = DataFrame()
         self.imax = 0
         self.ibreak = 0
-        self.average = [[], []]
+        self.average = [[], [], []]
         self.dtdr_dt = []
         self.cable = Cable(zo, length)
         self.name = ""
@@ -30,6 +34,10 @@ class Frame:
             self.name = name
 
         self.tdr[name] = ss.get_s11()
+        self.raw_s11[name] = ss.s1p[0]
+        self.raw_freq = ss.s1p[2]
+        self.td_w_os = ss.td_w_offset
+        self.td_wo_os = ss.td_wo_offset
         self.z_response[name] = np.abs(50 * ss.get_z_response())
         self.mean()
 
@@ -40,6 +48,7 @@ class Frame:
     def mean(self):
         self.average[0] = self.tdr.mean(axis=1)
         self.average[1] = self.z_response.mean(axis=1)
+        self.average[2] = self.raw_s11.mean(axis=1)
 
     def derivate(self):
         deriv = []
@@ -87,7 +96,7 @@ class Frame:
 
         pair = ramp_detector(self.average[0])
         tnl, nl_curve = nameless_function(self.timeline, pair, self.d2rdt2)
-        self.debug.append([tnl, nl_curve, 'nl'])
+        # self.debug.append([tnl, nl_curve, 'nl'])
         for p in pair:
             h = 0.5  # self.average[0][p[0]]
             rect = do_rect(self.timeline, p[0], p[1], height=h)
@@ -127,6 +136,18 @@ def plot_frames(frames, figure, q=None, debug=False):
 
         ib = frames[-1].ibreak
         ax.scatter(frames[-1].timeline[ib], frames[-1].average[0][ib], color='black')
+
+        plt.figure(2)
+        plt.stem(frames[0].raw_freq, frames[0].average[2])
+        plt.xscale('log')
+        plt.grid()
+
+        plt.figure(3)
+        plt.plot(frames[0].timeline, frames[0].td_w_os)
+        plt.plot(frames[0].timeline, frames[0].td_wo_os)
+        plt.grid()
+        plt.show()
+
 
     else:
         x = frames[0].x

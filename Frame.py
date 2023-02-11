@@ -119,7 +119,7 @@ class Frame:
         self.run()
 
 
-def plot_frames(frames, figure, q=None, debug=True):
+def plot_frames(frames, figure, q=None, debug=False):
     assert (len(frames) > 0)
     name = "Reflection by Guide Length"
     figure.suptitle(name, x=0.2, y=0.98)
@@ -144,14 +144,13 @@ def plot_frames(frames, figure, q=None, debug=True):
 
         plt.figure(3)
         plt.plot(frames[0].timeline, frames[0].td_w_os)
-        # plt.plot(frames[0].timeline, frames[0].td_wo_os)
+        plt.plot(frames[0].timeline, frames[0].td_wo_os)
         plt.grid()
 
         plt.figure(4)
         plt.plot(frames[0].timeline, frames[0].average[0])
-        # plt.plot(frames[0].timeline, frames[0].td_wo_os)
         plt.grid()
-
+        plt.legend()
         plt.show()
 
 

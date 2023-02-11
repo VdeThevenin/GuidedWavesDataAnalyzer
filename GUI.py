@@ -78,8 +78,8 @@ class GUI:
         layout = [
             [sg.Button('Connect', key='connect_serial'),
              sg.Button('Plot Ref', key='ref_btn', visible=False),
-             sg.Button('Plot New', key='pn_btn', visible=False),
-             sg.Button('Capture', key='capture_btn', visible=False),
+             sg.Button('Single', key='pn_btn', visible=False),
+             sg.Button('Periodic', key='capture_btn', visible=False),
              sg.Button('Real Time', key='rt_btn', visible=False)],
             [sg.Canvas(key='canvas', size=(300, 400)),
              sg.Frame(layout=param_column, title="frame", key='param_col')
@@ -173,12 +173,12 @@ class GUI:
                 capt = capt ^ True
 
                 if capt is True:
-                    self._VARS['window']['capture_btn'].Update("Stop Capture")
+                    self._VARS['window']['capture_btn'].Update("Stop Periodic")
                     ev = Event()
                     t = Thread(target=capture, args=(self.frames, nanovna, zo, glen, ev, 0.1))
                     t.start()
                 else:
-                    self._VARS['window']['capture_btn'].Update("Capture")
+                    self._VARS['window']['capture_btn'].Update("Periodic")
                     ev.set()
                     t.join(timeout=1)
 

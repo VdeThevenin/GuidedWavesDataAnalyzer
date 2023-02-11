@@ -34,7 +34,7 @@ def ifft(s1p, nfft=2**14):
 
     t_axis = np.linspace(0, 1 / (freqs[1]-freqs[0]), nfft)
 
-    td_r = [x for x in td]
+    td_r = [x for x in td_a]
     for i in range(1, len(td_r)):
         td_r[i] += td_r[i-1]
 

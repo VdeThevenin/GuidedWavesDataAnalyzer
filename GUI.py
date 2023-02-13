@@ -1,6 +1,7 @@
 import datetime
 import threading
 from os import path
+import os
 from threading import Thread
 from threading import Event
 import PySimpleGUI as sg
@@ -151,7 +152,18 @@ class GUI:
                 zp.zoom_factory(base_scale=1.1)
                 zp.pan_factory(plt.gca())
             elif event == 'ref_btn':
-                frame = set_frame(nanovna, zo, glen)
+                # frame = set_frame(nanovna, zo, glen)
+                pathtoref = './ref.frm'
+
+                check_file = os.path.isfile(pathtoref)
+                if not check_file:
+                    ref = set_frame(nanovna, zo, glen)
+                    export_ref(ref)
+                frame = import_ref()
+                # if len(self.frames) == 0:
+                #    self.frames.append(ref1)
+                # else:
+                #    self.frames[0] = ref1
 
                 c, ind, ws, er = calculate_params(zo, frame.cable.t_break, glen)
                 c = set_unit_prefix(c, "F")
@@ -391,6 +403,27 @@ def save_frame_collection_as_csv(frames, p):
     # filepath.parent.mkdir(parents=True, exist_ok=True)
 
     df.to_csv(filepath, index=False)
+
+
+def export_ref(frame: Frame):
+    # Step 1
+    import pickle
+    # Step 2
+    with open('ref.frm', 'wb') as frame_file:
+        # Step 3
+        pickle.dump(frame, frame_file)
+
+
+def import_ref():
+    # Step 1
+    import pickle
+
+    # Step 2
+    with open('ref.frm', 'rb') as frame_file:
+        # Step 3
+        frame = pickle.load(frame_file)
+
+    return frame
 
 
 tela = GUI()

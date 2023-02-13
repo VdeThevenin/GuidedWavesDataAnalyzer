@@ -1,4 +1,5 @@
 from Snapshot import Snapshot
+import pandas as pd
 from pandas import DataFrame
 from Cable import Cable
 import matplotlib.pyplot as plt
@@ -118,7 +119,21 @@ class Frame:
         self.cable.relative_permissivity = rp
         self.run()
 
+    def save_to_csv(self, path):
+        self.tdr['timeline'] = self.timeline
+        self.tdr = self.tdr.set_index('timeline')
+        self.tdr.to_csv(path)
 
+<<<<<<< Updated upstream
+=======
+    def get_from_csv(self, path):
+        ref = pd.read_csv(path)
+        self.timeline = ref['timeline']
+        self.tdr = ref
+        self.run()
+
+
+>>>>>>> Stashed changes
 def plot_frames(frames, figure, q=None, debug=False):
     assert (len(frames) > 0)
     name = "Reflection by Guide Length"
@@ -195,7 +210,6 @@ def plot_frames(frames, figure, q=None, debug=False):
 
     ax.set_xlabel('cable length [m]')
     ax.set_ylabel(r'$S_{11}$ [V]')
-
 
 def set_unit_prefix(value, main_unit):
     m_arr = ['k', 'M', 'G', 'T', 'P', 'E', 'Z', 'Y']
